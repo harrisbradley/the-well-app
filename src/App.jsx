@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './components/Dashboard';
+import Reader from './components/Reader';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Widget from './components/Widget';
@@ -19,6 +20,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/reader" 
+            element={
+              <PrivateRoute>
+                <Reader />
               </PrivateRoute>
             } 
           />
