@@ -2,6 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BIBLE_BOOKS, CATEGORIES } from '../data/books';
 import { useAuth } from '../context/AuthContext';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc 
+} from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Reader() {
   const { currentUser, logout } = useAuth();
@@ -12,18 +23,26 @@ export default function Reader() {
   const [activeChapter, setActiveChapter] = useState('1');
   
   // Scripture Content States
-  const [verses, setVerses] = useState({}); // JSON fallback mode
-  const [htmlContent, setHtmlContent] = useState(''); // API.Bible mode
+  const [verses, setVerses] = useState({});
   const [bookCache, setBookCache] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Layout states
+  // Annotations / Notes States
+  const [notes, setNotes] = useState([]);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [newNoteVerse, setNewNoteVerse] = useState(''); // Empty string means "Chapter Note"
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+
+  // Layout & Mode States
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notesPanelOpen, setNotesPanelOpen] = useState(true);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
+  const [ascensionMode, setAscensionMode] = useState(false); // Toggle Ascension Press Companion Mode
 
-  // UI state for book list navigation
+  // Category navigation state
   const [expandedCategories, setExpandedCategories] = useState({
     'Pentateuch': true,
     'Historical': false,
@@ -35,11 +54,6 @@ export default function Reader() {
 
   const scrollContainerRef = useRef(null);
 
-  // Read environment keys for API.Bible Option 3
-  const apiKey = import.meta.env.VITE_API_BIBLE_KEY;
-  const bibleId = import.meta.env.VITE_API_BIBLE_ID;
-  const isApiMode = !!(apiKey && bibleId && apiKey !== 'your_api_bible_key' && bibleId !== 'your_api_bible_id');
-
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
     setExpandedCategories(prev => ({
@@ -48,85 +62,44 @@ export default function Reader() {
     }));
   };
 
-  // Fetch and Cache Scripture
+  // Fetch and Cache Scripture JSON
   useEffect(() => {
-    if (!activeBook) return;
+    if (!activeBook || ascensionMode) return; // Skip fetching text if in Ascension mode
+    const cacheKey = activeBook.id;
 
-    if (isApiMode) {
-      // Option 3: API.Bible Mode (Querying RSV-CE or other configured translations)
-      setLoading(true);
-      setError(null);
-      setHtmlContent('');
+    if (bookCache[cacheKey]) {
+      setVerses(bookCache[cacheKey][activeChapter] || {});
+      return;
+    }
 
-      const chapterId = `${activeBook.usfmCode}.${activeChapter}`;
-      // API.Bible Chapter query parameters
-      const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/chapters/${chapterId}?content-type=html&include-notes=false&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
+    setLoading(true);
+    setError(null);
 
-      fetch(url, {
-        headers: {
-          'api-key': apiKey
+    const url = `https://raw.githubusercontent.com/xxruyle/Bible-DouayRheims/main/Douay-Rheims/${encodeURIComponent(activeBook.filename)}`;
+
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error('Network error loading text.');
+        return res.json();
+      })
+      .then(data => {
+        setBookCache(prev => ({ ...prev, [cacheKey]: data }));
+        setVerses(data[activeChapter] || {});
+        setLoading(false);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
         }
       })
-        .then(res => {
-          if (!res.ok) throw new Error('API request failed. Please check your API key or Bible ID.');
-          return res.json();
-        })
-        .then(payload => {
-          if (payload && payload.data && payload.data.content) {
-            setHtmlContent(payload.data.content);
-          } else {
-            throw new Error('Scripture content not found.');
-          }
-          setLoading(false);
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          setError('Could not fetch scripture from API.Bible. Check your credentials or network connection.');
-          setLoading(false);
-        });
-
-    } else {
-      // Option 1: Static JSON Fallback Mode (Douay-Rheims)
-      const cacheKey = activeBook.id;
-
-      if (bookCache[cacheKey]) {
-        setVerses(bookCache[cacheKey][activeChapter] || {});
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      const url = `https://raw.githubusercontent.com/xxruyle/Bible-DouayRheims/main/Douay-Rheims/${encodeURIComponent(activeBook.filename)}`;
-
-      fetch(url)
-        .then(res => {
-          if (!res.ok) throw new Error('Network error loading text.');
-          return res.json();
-        })
-        .then(data => {
-          setBookCache(prev => ({ ...prev, [cacheKey]: data }));
-          setVerses(data[activeChapter] || {});
-          setLoading(false);
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          setError('Could not download scripture text. Please check your internet connection.');
-          setLoading(false);
-        });
-    }
-  }, [activeBook, activeChapter, isApiMode, bibleId, apiKey]);
+      .catch(err => {
+        console.error(err);
+        setError('Could not download scripture text. Please check your internet connection.');
+        setLoading(false);
+      });
+  }, [activeBook, activeChapter, ascensionMode]);
 
   // Update local verses from cache in JSON mode when chapter shifts
   useEffect(() => {
-    if (isApiMode) return;
-    
+    if (ascensionMode) return;
     const cacheKey = activeBook.id;
     if (bookCache[cacheKey]) {
       setVerses(bookCache[cacheKey][activeChapter] || {});
@@ -134,7 +107,97 @@ export default function Reader() {
         scrollContainerRef.current.scrollTop = 0;
       }
     }
-  }, [activeChapter, bookCache, isApiMode, activeBook]);
+  }, [activeChapter, bookCache, ascensionMode, activeBook]);
+
+  // Firestore Real-Time Notes Listener
+  useEffect(() => {
+    if (!currentUser || !activeBook) return;
+
+    // Fetch notes matching userId, bookId, and chapter.
+    // We sort client-side to avoid requiring the user to set up a composite index in Firestore.
+    const notesRef = collection(db, 'notes');
+    const q = query(
+      notesRef,
+      where('userId', '==', currentUser.uid),
+      where('bookId', '==', activeBook.id),
+      where('chapter', '==', activeChapter)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedNotes = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort client-side: chapter notes first, then sorted by verse number numerically, then by creation date
+      const sortedNotes = fetchedNotes.sort((a, b) => {
+        const verseA = a.verse ? parseInt(a.verse, 10) : 0;
+        const verseB = b.verse ? parseInt(b.verse, 10) : 0;
+        
+        if (verseA !== verseB) {
+          return verseA - verseB;
+        }
+        
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+
+      setNotes(sortedNotes);
+    }, (err) => {
+      console.error("Firestore notes stream error:", err);
+    });
+
+    return unsubscribe;
+  }, [currentUser, activeBook, activeChapter]);
+
+  // Note CRUD handlers
+  const handleAddNote = async (e) => {
+    e.preventDefault();
+    if (!newNoteText.trim()) return;
+
+    try {
+      const notesRef = collection(db, 'notes');
+      await addDoc(notesRef, {
+        userId: currentUser.uid,
+        bookId: activeBook.id,
+        chapter: activeChapter,
+        verse: newNoteVerse.trim() || null,
+        text: newNoteText,
+        createdAt: Date.now()
+      });
+
+      setNewNoteText('');
+      setNewNoteVerse('');
+    } catch (err) {
+      console.error("Error adding note:", err);
+    }
+  };
+
+  const handleUpdateNote = async (id) => {
+    if (!editingText.trim()) return;
+
+    try {
+      const noteDocRef = doc(db, 'notes', id);
+      await updateDoc(noteDocRef, {
+        text: editingText,
+        updatedAt: Date.now()
+      });
+      setEditingNoteId(null);
+      setEditingText('');
+    } catch (err) {
+      console.error("Error updating note:", err);
+    }
+  };
+
+  const handleDeleteNote = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this reflection?")) return;
+
+    try {
+      const noteDocRef = doc(db, 'notes', id);
+      await deleteDoc(noteDocRef);
+    } catch (err) {
+      console.error("Error deleting note:", err);
+    }
+  };
 
   const handleBookChange = (book) => {
     setActiveBook(book);
@@ -154,7 +217,24 @@ export default function Reader() {
     }
   };
 
+  const nextChapter = () => {
+    const nextNum = parseInt(activeChapter, 10) + 1;
+    if (nextNum <= activeBook.chapters) {
+      setActiveChapter(String(nextNum));
+    }
+  };
+
+  const prevChapter = () => {
+    const prevNum = parseInt(activeChapter, 10) - 1;
+    if (prevNum >= 1) {
+      setActiveChapter(String(prevNum));
+    }
+  };
+
   const chaptersList = Array.from({ length: activeBook.chapters }, (_, i) => i + 1);
+
+  // Ascension Press Bible URL generator
+  const ascensionUrl = `https://app.ascensionpress.com/bible/books/${activeBook.ascensionCode}/${activeChapter}`;
 
   return (
     <div style={{
@@ -166,7 +246,7 @@ export default function Reader() {
       color: 'var(--text-ivory)',
     }}>
       
-      {/* 1. SIDEBAR NAVIGATION */}
+      {/* 1. LEFT SIDEBAR NAVIGATION */}
       <aside style={{
         width: sidebarOpen && !distractionFree ? '320px' : '0px',
         opacity: sidebarOpen && !distractionFree ? 1 : 0,
@@ -305,14 +385,9 @@ export default function Reader() {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-slate)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
-              {currentUser?.email}
-            </span>
-            <span style={{ fontSize: '9px', color: 'var(--color-sacred-gold)', fontWeight: 600 }}>
-              {isApiMode ? 'API.BIBLE MODE' : 'DOUAY-RHEIMS MODE'}
-            </span>
-          </div>
+          <span style={{ fontSize: '12px', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+            {currentUser?.email}
+          </span>
           <button 
             className="btn btn-secondary" 
             onClick={handleLogout}
@@ -323,7 +398,7 @@ export default function Reader() {
         </div>
       </aside>
 
-      {/* 2. MAIN READING WORKSPACE */}
+      {/* 2. CENTER READING WORKSPACE */}
       <main style={{
         flex: 1,
         display: 'flex',
@@ -372,22 +447,79 @@ export default function Reader() {
               </h2>
             </div>
 
+            {/* Middle Toolbar Toggles: Reading Mode vs Ascension Companion Mode */}
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(8, 10, 12, 0.6)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
+              <button
+                onClick={() => setAscensionMode(false)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                  color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Read Translation
+              </button>
+              <button
+                onClick={() => setAscensionMode(true)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                  color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Ascension Companion
+              </button>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <button 
-                  onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
-                  style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  A-
-                </button>
-                <span style={{ fontSize: '12px', color: 'var(--text-dim)', padding: '0 4px' }}>{fontSize}px</span>
-                <button 
-                  onClick={() => setFontSize(prev => Math.min(26, prev + 2))}
-                  style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  A+
-                </button>
-              </div>
+              {/* Font Sizers - Only visible when reading inline text */}
+              {!ascensionMode && (
+                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button 
+                    onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
+                    style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    A-
+                  </button>
+                  <span style={{ fontSize: '12px', color: 'var(--text-dim)', padding: '0 4px' }}>{fontSize}px</span>
+                  <button 
+                    onClick={() => setFontSize(prev => Math.min(26, prev + 2))}
+                    style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    A+
+                  </button>
+                </div>
+              )}
+
+              {/* Reflections toggle button */}
+              <button
+                onClick={() => setNotesPanelOpen(prev => !prev)}
+                style={{
+                  background: notesPanelOpen ? 'rgba(229, 193, 88, 0.15)' : 'transparent',
+                  border: '1px solid rgba(229, 193, 88, 0.2)',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  color: 'var(--color-sacred-gold)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                📝 Reflections {notes.length > 0 ? `(${notes.length})` : ''}
+              </button>
 
               <button
                 onClick={() => setDistractionFree(true)}
@@ -401,7 +533,6 @@ export default function Reader() {
                   fontSize: '13px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
                 }}
               >
                 Focus Mode
@@ -462,7 +593,7 @@ export default function Reader() {
                     borderRadius: '50%',
                     border: 'none',
                     background: isActive ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: isActive ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    color: isActive ? 'var(--text-slate)' : 'var(--text-slate)',
                     fontSize: '13px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -476,7 +607,7 @@ export default function Reader() {
           </div>
         )}
 
-        {/* 3. SCRIPTURE TEXT VIEWER COLUMN */}
+        {/* 3. CENTER VIEWPORT CONTENT */}
         <div 
           ref={scrollContainerRef}
           style={{
@@ -484,104 +615,177 @@ export default function Reader() {
             overflowY: 'auto',
             padding: distractionFree ? '64px 24px' : '40px 24px',
             display: 'flex',
-            justifyContent: 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
             background: distractionFree ? '#06080A' : 'var(--bg-midnight)',
             transition: 'background-color var(--transition-slow)',
           }}
         >
-          <div style={{
-            maxWidth: '680px',
-            width: '100%',
-          }}>
-            {/* Loading Indicator */}
-            {loading && (
+          {ascensionMode ? (
+            /* Mode B: Ascension Press Companion Mode */
+            <div className="fade-in" style={{
+              maxWidth: '600px',
+              width: '100%',
+              textAlign: 'center',
+              paddingTop: '40px',
+              paddingBottom: '80px',
+            }}>
               <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                background: 'rgba(229, 193, 88, 0.08)',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minHeight: '200px',
-                gap: '16px',
+                margin: '0 auto 24px auto',
+                border: '1px solid rgba(229, 193, 88, 0.2)',
               }}>
-                <div className="pulse-gold" style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '50%',
-                  border: '2px solid var(--color-sacred-gold)',
-                  borderTopColor: 'transparent',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-sacred-gold)" strokeWidth="1.2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
-            )}
 
-            {/* Error Message */}
-            {error && !loading && (
-              <div className="glass-panel" style={{
-                padding: '24px',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                background: 'rgba(239, 68, 68, 0.05)',
-                color: '#FCA5A5',
-                textAlign: 'center',
-                margin: '40px 0',
-              }}>
-                <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', color: 'var(--color-sacred-gold)', marginBottom: '12px' }}>
+                Ascension Companion
+              </h1>
+              <p style={{ color: 'var(--text-slate)', fontSize: '15px', lineHeight: 1.6, marginBottom: '40px' }}>
+                Open this chapter directly on the **Ascension Press Bible App** to read along with the Great Adventure timeline notes. Any notes you log in the right-side Reflections panel will be automatically linked to this chapter context!
+              </p>
+
+              {/* Big Launcher Button */}
+              <a 
+                href={ascensionUrl} 
+                target="_blank" 
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '18px 36px',
+                  fontSize: '16px',
+                  borderRadius: 'var(--radius-md)',
+                  textDecoration: 'none',
+                  boxShadow: '0 8px 24px rgba(229, 193, 88, 0.2)',
+                  marginBottom: '48px',
+                }}
+              >
+                <span>Read {activeBook.name} {activeChapter} on Ascension ↗</span>
+              </a>
+
+              {/* Chapter Steppers */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '40px' }}>
                 <button 
-                  className="btn btn-primary" 
-                  onClick={() => handleBookChange(activeBook)}
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  className="btn btn-secondary" 
+                  onClick={prevChapter}
+                  disabled={activeChapter === '1'}
+                  style={{ opacity: activeChapter === '1' ? 0.4 : 1 }}
                 >
-                  Retry Load
+                  ← Previous Chapter
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={nextChapter}
+                  disabled={parseInt(activeChapter, 10) >= activeBook.chapters}
+                  style={{ opacity: parseInt(activeChapter, 10) >= activeBook.chapters ? 0.4 : 1 }}
+                >
+                  Next Chapter →
                 </button>
               </div>
-            )}
 
-            {/* Scripture Render Column */}
-            {!loading && !error && (
-              <div className="fade-in" style={{ paddingBottom: '120px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-                  <p style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '11px',
-                    color: 'var(--color-sacred-gold)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.12em',
-                    marginBottom: '8px',
-                  }}>
-                    {activeBook.name}
-                  </p>
-                  <h1 style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: '44px',
-                    color: 'var(--text-ivory)',
-                    fontWeight: 600,
-                  }}>
-                    Chapter {activeChapter}
-                  </h1>
-                  <hr style={{
-                    width: '40px',
-                    margin: '16px auto 0 auto',
-                    border: 'none',
-                    borderTop: '2px solid var(--color-sacred-gold)',
-                    opacity: 0.7,
+              {/* Windows Tiling Tip */}
+              <div className="glass-panel" style={{
+                padding: '20px',
+                background: 'rgba(20, 26, 32, 0.4)',
+                textAlign: 'left',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+              }}>
+                <h4 style={{ fontSize: '13px', color: 'var(--text-ivory)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  💡 Homelab Tip: Side-by-Side Reading
+                </h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-slate)', lineHeight: 1.5 }}>
+                  Use Windows snapping to tile your browser windows! Click and drag the Ascension Press tab to the left edge of your screen, and snap The Well App to the right side to type reflections in real-time as you read.
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* Mode A: Default Douay-Rheims Scripture Reader Column */
+            <div style={{
+              maxWidth: '680px',
+              width: '100%',
+            }}>
+              {loading && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '200px',
+                  gap: '16px',
+                }}>
+                  <div className="pulse-gold" style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    border: '2px solid var(--color-sacred-gold)',
+                    borderTopColor: 'transparent',
+                    animation: 'spin 1s linear infinite'
                   }} />
+                  <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
                 </div>
+              )}
 
-                {isApiMode ? (
-                  /* API.Bible Render: Render HTML content directly */
-                  <div 
-                    className="api-scripture-content"
-                    dangerouslySetInnerHTML={{ __html: htmlContent }} 
-                    style={{
+              {error && !loading && (
+                <div className="glass-panel" style={{
+                  padding: '24px',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  color: '#FCA5A5',
+                  textAlign: 'center',
+                  margin: '40px 0',
+                }}>
+                  <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleBookChange(activeBook)}
+                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                  >
+                    Retry Load
+                  </button>
+                </div>
+              )}
+
+              {!loading && !error && (
+                <div className="fade-in" style={{ paddingBottom: '120px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+                    <p style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '11px',
+                      color: 'var(--color-sacred-gold)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.12em',
+                      marginBottom: '8px',
+                    }}>
+                      {activeBook.name}
+                    </p>
+                    <h1 style={{
                       fontFamily: 'var(--font-serif)',
-                      fontSize: `${fontSize}px`,
-                      lineHeight: '1.85',
-                      color: '#ECE8E1',
-                      textAlign: 'justify',
-                    }}
-                  />
-                ) : (
-                  /* JSON Fallback Render: Render verse mapping */
+                      fontSize: '44px',
+                      color: 'var(--text-ivory)',
+                      fontWeight: 600,
+                    }}>
+                      Chapter {activeChapter}
+                    </h1>
+                    <hr style={{
+                      width: '40px',
+                      margin: '16px auto 0 auto',
+                      border: 'none',
+                      borderTop: '2px solid var(--color-sacred-gold)',
+                      opacity: 0.7,
+                    }} />
+                  </div>
+
                   <div style={{
                     fontFamily: 'var(--font-serif)',
                     fontSize: `${fontSize}px`,
@@ -608,48 +812,224 @@ export default function Reader() {
                       );
                     })}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
       </main>
 
-      {/* Embedded CSS for API.Bible HTML formatting and Spin animation */}
+      {/* 3. RIGHT SIDEBAR: REFLECTIONS & NOTE STACKING */}
+      <aside style={{
+        width: notesPanelOpen && !distractionFree ? '360px' : '0px',
+        opacity: notesPanelOpen && !distractionFree ? 1 : 0,
+        transform: notesPanelOpen && !distractionFree ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'width var(--transition-normal), opacity var(--transition-normal), transform var(--transition-normal)',
+        borderLeft: notesPanelOpen && !distractionFree ? '1px solid rgba(229, 193, 88, 0.12)' : 'none',
+        background: 'var(--bg-deep-charcoal)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        zIndex: 5,
+      }}>
+        {/* Reflections Header */}
+        <div style={{
+          padding: '24px 20px',
+          borderBottom: '1px solid rgba(229, 193, 88, 0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h3 style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '18px',
+              color: 'var(--color-sacred-gold)',
+              fontWeight: 600,
+            }}>
+              Reflections
+            </h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+              {activeBook.name} {activeChapter}
+            </p>
+          </div>
+          <button 
+            onClick={() => setNotesPanelOpen(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-slate)',
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Notes Timeline Stack */}
+        <div style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}>
+          {notes.length === 0 ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--text-dim)',
+              textAlign: 'center',
+              padding: '40px 20px',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: '12px', opacity: 0.5 }}>
+                <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <p style={{ fontSize: '13px' }}>No reflections logged for this chapter yet.</p>
+              <p style={{ fontSize: '11px', marginTop: '6px' }}>Type in the field below to catalog your study notes.</p>
+            </div>
+          ) : (
+            notes.map(note => {
+              const isEditing = editingNoteId === note.id;
+              return (
+                <div 
+                  key={note.id} 
+                  className="glass-panel" 
+                  style={{
+                    padding: '16px',
+                    background: 'rgba(8, 10, 12, 0.4)',
+                    border: '1px solid rgba(229, 193, 88, 0.12)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                  }}
+                >
+                  {/* Note Header Metadata */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '11px',
+                      color: 'var(--color-sacred-gold)',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {note.verse ? `Verse ${note.verse}` : 'Chapter Note'}
+                    </span>
+                    
+                    {/* Action Controls */}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {!isEditing && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setEditingNoteId(note.id);
+                              setEditingText(note.text);
+                            }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-slate)', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNote(note.id)}
+                            style={{ background: 'none', border: 'none', color: '#FCA5A5', fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Note Body Text */}
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <textarea
+                        className="input-field"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        style={{ minHeight: '80px', fontSize: '13px', resize: 'vertical' }}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          onClick={() => setEditingNoteId(null)}
+                          style={{ padding: '4px 10px', fontSize: '11px' }}
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          className="btn btn-primary" 
+                          onClick={() => handleUpdateNote(note.id)}
+                          style={{ padding: '4px 10px', fontSize: '11px' }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{
+                      fontSize: '13px',
+                      color: 'var(--text-ivory)',
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: '1.5',
+                    }}>
+                      {note.text}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Note Creator Input Form */}
+        <div style={{
+          padding: '20px',
+          borderTop: '1px solid rgba(229, 193, 88, 0.1)',
+          background: 'rgba(8, 10, 12, 0.6)'
+        }}>
+          <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g. 5, or leave blank"
+                value={newNoteVerse}
+                onChange={(e) => setNewNoteVerse(e.target.value.replace(/[^0-9]/g, ''))}
+                style={{ width: '130px', padding: '6px 10px', fontSize: '12px' }}
+              />
+            </div>
+
+            <textarea
+              className="input-field"
+              placeholder={`Write note for ${activeBook.name} ${activeChapter}...`}
+              value={newNoteText}
+              onChange={(e) => setNewNoteText(e.target.value)}
+              style={{ minHeight: '100px', fontSize: '13px', resize: 'none' }}
+              required
+            />
+
+            <button 
+              className="btn btn-primary" 
+              type="submit" 
+              style={{ width: '100%', padding: '10px' }}
+            >
+              Add Reflection
+            </button>
+          </form>
+        </div>
+      </aside>
+
+      {/* Embedded Spin Animation keyframe */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
-        }
-        
-        /* Style adjustments for API.Bible HTML elements */
-        .api-scripture-content p {
-          margin-bottom: 16px;
-        }
-        .api-scripture-content .v {
-          font-family: var(--font-sans);
-          font-size: 0.6em;
-          font-weight: 700;
-          color: var(--color-sacred-gold);
-          margin-right: 4px;
-          vertical-align: super;
-        }
-        .api-scripture-content .q1, .api-scripture-content .q2 {
-          display: block;
-          margin-bottom: 4px;
-        }
-        .api-scripture-content .q1 { padding-left: 16px; }
-        .api-scripture-content .q2 { padding-left: 32px; }
-        .api-scripture-content .s1 {
-          display: block;
-          font-family: var(--font-sans);
-          font-size: 0.8em;
-          font-weight: 600;
-          color: var(--color-sacred-gold);
-          text-transform: uppercase;
-          margin-top: 24px;
-          margin-bottom: 8px;
-          letter-spacing: 0.05em;
         }
       `}</style>
     </div>
