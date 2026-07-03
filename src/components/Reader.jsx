@@ -11,8 +11,9 @@ export default function Reader() {
   const [activeBook, setActiveBook] = useState(BIBLE_BOOKS[0]); // Default to Genesis
   const [activeChapter, setActiveChapter] = useState('1');
   
-  // Verse and Cache states
-  const [verses, setVerses] = useState({});
+  // Scripture Content States
+  const [verses, setVerses] = useState({}); // JSON fallback mode
+  const [htmlContent, setHtmlContent] = useState(''); // API.Bible mode
   const [bookCache, setBookCache] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -34,6 +35,11 @@ export default function Reader() {
 
   const scrollContainerRef = useRef(null);
 
+  // Read environment keys for API.Bible Option 3
+  const apiKey = import.meta.env.VITE_API_BIBLE_KEY;
+  const bibleId = import.meta.env.VITE_API_BIBLE_ID;
+  const isApiMode = !!(apiKey && bibleId && apiKey !== 'your_api_bible_key' && bibleId !== 'your_api_bible_id');
+
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
     setExpandedCategories(prev => ({
@@ -42,44 +48,85 @@ export default function Reader() {
     }));
   };
 
-  // Fetch and Cache Scripture JSON
+  // Fetch and Cache Scripture
   useEffect(() => {
     if (!activeBook) return;
-    const cacheKey = activeBook.id;
 
-    if (bookCache[cacheKey]) {
-      setVerses(bookCache[cacheKey][activeChapter] || {});
-      return;
-    }
+    if (isApiMode) {
+      // Option 3: API.Bible Mode (Querying RSV-CE or other configured translations)
+      setLoading(true);
+      setError(null);
+      setHtmlContent('');
 
-    setLoading(true);
-    setError(null);
+      const chapterId = `${activeBook.usfmCode}.${activeChapter}`;
+      // API.Bible Chapter query parameters
+      const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/chapters/${chapterId}?content-type=html&include-notes=false&include-titles=true&include-chapter-numbers=false&include-verse-numbers=true`;
 
-    const url = `https://raw.githubusercontent.com/xxruyle/Bible-DouayRheims/main/Douay-Rheims/${encodeURIComponent(activeBook.filename)}`;
-
-    fetch(url)
-      .then(res => {
-        if (!res.ok) throw new Error('Network error loading text.');
-        return res.json();
-      })
-      .then(data => {
-        setBookCache(prev => ({ ...prev, [cacheKey]: data }));
-        setVerses(data[activeChapter] || {});
-        setLoading(false);
-        // Scroll reading panel to top when changing book
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = 0;
+      fetch(url, {
+        headers: {
+          'api-key': apiKey
         }
       })
-      .catch(err => {
-        console.error(err);
-        setError('Could not download scripture text. Please check your internet connection.');
-        setLoading(false);
-      });
-  }, [activeBook]);
+        .then(res => {
+          if (!res.ok) throw new Error('API request failed. Please check your API key or Bible ID.');
+          return res.json();
+        })
+        .then(payload => {
+          if (payload && payload.data && payload.data.content) {
+            setHtmlContent(payload.data.content);
+          } else {
+            throw new Error('Scripture content not found.');
+          }
+          setLoading(false);
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          setError('Could not fetch scripture from API.Bible. Check your credentials or network connection.');
+          setLoading(false);
+        });
 
-  // Update verses locally when chapter changes (utilizing cached book data)
+    } else {
+      // Option 1: Static JSON Fallback Mode (Douay-Rheims)
+      const cacheKey = activeBook.id;
+
+      if (bookCache[cacheKey]) {
+        setVerses(bookCache[cacheKey][activeChapter] || {});
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      const url = `https://raw.githubusercontent.com/xxruyle/Bible-DouayRheims/main/Douay-Rheims/${encodeURIComponent(activeBook.filename)}`;
+
+      fetch(url)
+        .then(res => {
+          if (!res.ok) throw new Error('Network error loading text.');
+          return res.json();
+        })
+        .then(data => {
+          setBookCache(prev => ({ ...prev, [cacheKey]: data }));
+          setVerses(data[activeChapter] || {});
+          setLoading(false);
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          setError('Could not download scripture text. Please check your internet connection.');
+          setLoading(false);
+        });
+    }
+  }, [activeBook, activeChapter, isApiMode, bibleId, apiKey]);
+
+  // Update local verses from cache in JSON mode when chapter shifts
   useEffect(() => {
+    if (isApiMode) return;
+    
     const cacheKey = activeBook.id;
     if (bookCache[cacheKey]) {
       setVerses(bookCache[cacheKey][activeChapter] || {});
@@ -87,7 +134,7 @@ export default function Reader() {
         scrollContainerRef.current.scrollTop = 0;
       }
     }
-  }, [activeChapter, bookCache]);
+  }, [activeChapter, bookCache, isApiMode, activeBook]);
 
   const handleBookChange = (book) => {
     setActiveBook(book);
@@ -107,7 +154,6 @@ export default function Reader() {
     }
   };
 
-  // Helper list for chapters rendering
   const chaptersList = Array.from({ length: activeBook.chapters }, (_, i) => i + 1);
 
   return (
@@ -120,7 +166,7 @@ export default function Reader() {
       color: 'var(--text-ivory)',
     }}>
       
-      {/* 1. SIDEBAR NAVIGATION - Hides completely in distractionFree mode or on mobile if closed */}
+      {/* 1. SIDEBAR NAVIGATION */}
       <aside style={{
         width: sidebarOpen && !distractionFree ? '320px' : '0px',
         opacity: sidebarOpen && !distractionFree ? 1 : 0,
@@ -186,7 +232,6 @@ export default function Reader() {
             
             return (
               <div key={category} style={{ marginBottom: '16px' }}>
-                {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(category)}
                   style={{
@@ -212,7 +257,6 @@ export default function Reader() {
                   <span style={{ fontSize: '10px' }}>{isExpanded ? '▲' : '▼'}</span>
                 </button>
 
-                {/* Category Books List */}
                 <div style={{
                   height: isExpanded ? 'auto' : '0px',
                   opacity: isExpanded ? 1 : 0,
@@ -253,7 +297,7 @@ export default function Reader() {
           })}
         </div>
 
-        {/* User Info / Logout Footer */}
+        {/* Footer */}
         <div style={{
           padding: '16px 20px',
           borderTop: '1px solid rgba(229, 193, 88, 0.1)',
@@ -261,9 +305,14 @@ export default function Reader() {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
-            {currentUser?.email}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-slate)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+              {currentUser?.email}
+            </span>
+            <span style={{ fontSize: '9px', color: 'var(--color-sacred-gold)', fontWeight: 600 }}>
+              {isApiMode ? 'API.BIBLE MODE' : 'DOUAY-RHEIMS MODE'}
+            </span>
+          </div>
           <button 
             className="btn btn-secondary" 
             onClick={handleLogout}
@@ -284,7 +333,7 @@ export default function Reader() {
         position: 'relative',
       }}>
         
-        {/* Reading Header Toolbar (Control Panel) */}
+        {/* Reading Header Toolbar */}
         {!distractionFree && (
           <header style={{
             height: '64px',
@@ -298,7 +347,6 @@ export default function Reader() {
             zIndex: 4,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Sidebar toggle button (hamburger) */}
               {!sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
@@ -315,7 +363,6 @@ export default function Reader() {
                 </button>
               )}
 
-              {/* Title & Location indicator */}
               <h2 style={{
                 fontFamily: 'var(--font-serif)',
                 fontSize: '20px',
@@ -325,9 +372,7 @@ export default function Reader() {
               </h2>
             </div>
 
-            {/* Typography and Reading Mode controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Font Sizers */}
               <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <button 
                   onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
@@ -344,7 +389,6 @@ export default function Reader() {
                 </button>
               </div>
 
-              {/* Distraction Free Button */}
               <button
                 onClick={() => setDistractionFree(true)}
                 style={{
@@ -359,7 +403,6 @@ export default function Reader() {
                   cursor: 'pointer',
                   transition: 'all var(--transition-fast)',
                 }}
-                title="Enter distraction-free mode"
               >
                 Focus Mode
               </button>
@@ -367,7 +410,7 @@ export default function Reader() {
           </header>
         )}
 
-        {/* Floating Focus Mode exit control button (Only visible in focus mode) */}
+        {/* Exit Focus Floating Button */}
         {distractionFree && (
           <button
             onClick={() => setDistractionFree(false)}
@@ -386,14 +429,13 @@ export default function Reader() {
               cursor: 'pointer',
               zIndex: 10,
               boxShadow: 'var(--shadow-glass)',
-              transition: 'opacity 0.2s',
             }}
           >
             ✕ Exit Focus
           </button>
         )}
 
-        {/* Chapter Selection Ribbon (horizontal list) */}
+        {/* Chapter Selection Ribbon */}
         {!distractionFree && (
           <div style={{
             background: 'var(--bg-deep-charcoal)',
@@ -494,10 +536,9 @@ export default function Reader() {
               </div>
             )}
 
-            {/* Scripture Verse Column */}
+            {/* Scripture Render Column */}
             {!loading && !error && (
               <div className="fade-in" style={{ paddingBottom: '120px' }}>
-                {/* Chapter Heading decoration */}
                 <div style={{ textAlign: 'center', marginBottom: '48px' }}>
                   <p style={{
                     fontFamily: 'var(--font-sans)',
@@ -526,34 +567,48 @@ export default function Reader() {
                   }} />
                 </div>
 
-                {/* Verses Renders */}
-                <div style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: `${fontSize}px`,
-                  lineHeight: '1.85',
-                  color: '#ECE8E1', /* Traditional book-ish warm color */
-                  textAlign: 'justify',
-                }}>
-                  {Object.entries(verses).map(([verseNum, text]) => {
-                    // Strip starting asterisks if any, or render them cleanly
-                    const cleanText = text.replace(/^\*/, '');
-                    return (
-                      <span key={verseNum} style={{ marginRight: '8px' }}>
-                        <sup style={{
-                          fontFamily: 'var(--font-sans)',
-                          fontSize: '0.6em',
-                          fontWeight: 700,
-                          color: 'var(--color-sacred-gold)',
-                          marginRight: '4px',
-                          verticalAlign: 'super',
-                        }}>
-                          {verseNum}
-                        </sup>
-                        {cleanText}
-                      </span>
-                    );
-                  })}
-                </div>
+                {isApiMode ? (
+                  /* API.Bible Render: Render HTML content directly */
+                  <div 
+                    className="api-scripture-content"
+                    dangerouslySetInnerHTML={{ __html: htmlContent }} 
+                    style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: `${fontSize}px`,
+                      lineHeight: '1.85',
+                      color: '#ECE8E1',
+                      textAlign: 'justify',
+                    }}
+                  />
+                ) : (
+                  /* JSON Fallback Render: Render verse mapping */
+                  <div style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: `${fontSize}px`,
+                    lineHeight: '1.85',
+                    color: '#ECE8E1',
+                    textAlign: 'justify',
+                  }}>
+                    {Object.entries(verses).map(([verseNum, text]) => {
+                      const cleanText = text.replace(/^\*/, '');
+                      return (
+                        <span key={verseNum} style={{ marginRight: '8px' }}>
+                          <sup style={{
+                            fontFamily: 'var(--font-sans)',
+                            fontSize: '0.6em',
+                            fontWeight: 700,
+                            color: 'var(--color-sacred-gold)',
+                            marginRight: '4px',
+                            verticalAlign: 'super',
+                          }}>
+                            {verseNum}
+                          </sup>
+                          {cleanText}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -561,10 +616,40 @@ export default function Reader() {
 
       </main>
 
-      {/* Embedded Spin Animation keyframe */}
+      {/* Embedded CSS for API.Bible HTML formatting and Spin animation */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        
+        /* Style adjustments for API.Bible HTML elements */
+        .api-scripture-content p {
+          margin-bottom: 16px;
+        }
+        .api-scripture-content .v {
+          font-family: var(--font-sans);
+          font-size: 0.6em;
+          font-weight: 700;
+          color: var(--color-sacred-gold);
+          margin-right: 4px;
+          vertical-align: super;
+        }
+        .api-scripture-content .q1, .api-scripture-content .q2 {
+          display: block;
+          margin-bottom: 4px;
+        }
+        .api-scripture-content .q1 { padding-left: 16px; }
+        .api-scripture-content .q2 { padding-left: 32px; }
+        .api-scripture-content .s1 {
+          display: block;
+          font-family: var(--font-sans);
+          font-size: 0.8em;
+          font-weight: 600;
+          color: var(--color-sacred-gold);
+          text-transform: uppercase;
+          margin-top: 24px;
+          margin-bottom: 8px;
+          letter-spacing: 0.05em;
         }
       `}</style>
     </div>
