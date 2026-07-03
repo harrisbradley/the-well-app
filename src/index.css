@@ -1,0 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+:root {
+  /* Colors */
+  --bg-midnight: #080A0C;
+  --bg-deep-charcoal: #101418;
+  --bg-glass: rgba(20, 26, 32, 0.65);
+  --bg-glass-hover: rgba(30, 38, 46, 0.8);
+  
+  --color-sacred-gold: #E5C158;
+  --color-sacred-gold-hover: #F0D582;
+  --color-bronze: #BC9232;
+  --color-bronze-dark: #7A5B15;
+  --color-card-border: rgba(229, 193, 88, 0.15);
+  --color-card-border-focus: rgba(229, 193, 88, 0.4);
+  
+  --text-ivory: #F7F5F0;
+  --text-slate: #94A3B8;
+  --text-dim: #64748B;
+  
+  /* Fonts */
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Layout & Shadows */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --shadow-gold: 0 4px 20px rgba(229, 193, 88, 0.1);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  
+  /* Animation */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-bronze-dark) var(--bg-midnight);
+}
+
+body {
+  background-color: var(--bg-midnight);
+  color: var(--text-ivory);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-midnight);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bronze-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sacred-gold);
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glass);
+  transition: border-color var(--transition-normal), transform var(--transition-normal);
+}
+
+.glass-panel:hover {
+  border-color: var(--color-card-border-focus);
+}
+
+.glass-panel-interactive {
+  composes: glass-panel;
+  cursor: pointer;
+}
+
+.glass-panel-interactive:hover {
+  transform: translateY(-2px);
+  background: var(--bg-glass-hover);
+  box-shadow: var(--shadow-gold), var(--shadow-glass);
+}
+
+/* Inputs & Form Fields */
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(8, 10, 12, 0.8);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-ivory);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-field:focus {
+  border-color: var(--color-sacred-gold);
+  box-shadow: 0 0 0 2px rgba(229, 193, 88, 0.15);
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-slate);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background: var(--color-sacred-gold);
+  color: var(--bg-midnight);
+}
+
+.btn-primary:hover {
+  background: var(--color-sacred-gold-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(229, 193, 88, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-sacred-gold);
+  border: 1px solid var(--color-sacred-gold);
+}
+
+.btn-secondary:hover {
+  background: rgba(229, 193, 88, 0.08);
+  border-color: var(--color-sacred-gold-hover);
+  color: var(--color-sacred-gold-hover);
+}
+
+/* Animations */
+@keyframes pulse-gold {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+}
+
+.pulse-gold {
+  animation: pulse-gold 2s infinite ease-in-out;
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
