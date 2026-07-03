@@ -1,0 +1,95 @@
+export const BIBLE_BOOKS = [
+  // PENTATEUCH
+  { id: 'genesis', name: 'Genesis', filename: 'Genesis.json', chapters: 50, category: 'Pentateuch' },
+  { id: 'exodus', name: 'Exodus', filename: 'Exodus.json', chapters: 40, category: 'Pentateuch' },
+  { id: 'leviticus', name: 'Leviticus', filename: 'Leviticus.json', chapters: 27, category: 'Pentateuch' },
+  { id: 'numbers', name: 'Numbers', filename: 'Numbers.json', chapters: 36, category: 'Pentateuch' },
+  { id: 'deuteronomy', name: 'Deuteronomy', filename: 'Deuteronomy.json', chapters: 34, category: 'Pentateuch' },
+
+  // HISTORICAL
+  { id: 'josue', name: 'Josue (Joshua)', filename: 'Josue.json', chapters: 24, category: 'Historical' },
+  { id: 'judges', name: 'Judges', filename: 'Judges.json', chapters: 21, category: 'Historical' },
+  { id: 'ruth', name: 'Ruth', filename: 'Ruth.json', chapters: 4, category: 'Historical' },
+  { id: '1kings', name: '1 Kings (1 Samuel)', filename: '1 Kings.json', chapters: 31, category: 'Historical' },
+  { id: '2kings', name: '2 Kings (2 Samuel)', filename: '2 Kings.json', chapters: 24, category: 'Historical' },
+  { id: '3kings', name: '3 Kings (1 Kings)', filename: '3 Kings.json', chapters: 22, category: 'Historical' },
+  { id: '4kings', name: '4 Kings (2 Kings)', filename: '4 Kings.json', chapters: 25, category: 'Historical' },
+  { id: '1paralipomenon', name: '1 Paralipomenon (1 Chron)', filename: '1 Paralipomenon.json', chapters: 29, category: 'Historical' },
+  { id: '2paralipomenon', name: '2 Paralipomenon (2 Chron)', filename: '2 Paralipomenon.json', chapters: 36, category: 'Historical' },
+  { id: '1esdras', name: '1 Esdras (Ezra)', filename: '1 Esdras.json', chapters: 10, category: 'Historical' },
+  { id: '2esdras', name: '2 Esdras (Nehemiah)', filename: '2 Esdras.json', chapters: 13, category: 'Historical' },
+  { id: 'tobias', name: 'Tobias (Tobit)', filename: 'Tobias.json', chapters: 14, category: 'Historical' },
+  { id: 'judith', name: 'Judith', filename: 'Judith.json', chapters: 16, category: 'Historical' },
+  { id: 'esther', name: 'Esther', filename: 'Esther.json', chapters: 16, category: 'Historical' },
+  { id: '1machabees', name: '1 Machabees', filename: '1 Machabees.json', chapters: 16, category: 'Historical' },
+  { id: '2machabees', name: '2 Machabees', filename: '2 Machabees.json', chapters: 15, category: 'Historical' },
+
+  // WISDOM
+  { id: 'job', name: 'Job', filename: 'Job.json', chapters: 42, category: 'Wisdom' },
+  { id: 'pslams', name: 'Psalms', filename: 'Psalms.json', chapters: 150, category: 'Wisdom' },
+  { id: 'proverbs', name: 'Proverbs', filename: 'Proverbs.json', chapters: 31, category: 'Wisdom' },
+  { id: 'ecclesiastes', name: 'Ecclesiastes', filename: 'Ecclesiastes.json', chapters: 12, category: 'Wisdom' },
+  { id: 'canticles', name: 'Canticles (Song of Songs)', filename: 'Canticles.json', chapters: 8, category: 'Wisdom' },
+  { id: 'wisdom', name: 'Wisdom', filename: 'Wisdom.json', chapters: 19, category: 'Wisdom' },
+  { id: 'ecclesiasticus', name: 'Ecclesiasticus (Sirach)', filename: 'Ecclesiasticus.json', chapters: 51, category: 'Wisdom' },
+
+  // PROPHETS
+  { id: 'isaias', name: 'Isaias (Isaiah)', filename: 'Isaias.json', chapters: 66, category: 'Prophets' },
+  { id: 'jeremias', name: 'Jeremias (Jeremiah)', filename: 'Jeremias.json', chapters: 52, category: 'Prophets' },
+  { id: 'lamentations', name: 'Lamentations', filename: 'Lamentations.json', chapters: 5, category: 'Prophets' },
+  { id: 'baruch', name: 'Baruch', filename: 'Baruch.json', chapters: 6, category: 'Prophets' },
+  { id: 'ezechiel', name: 'Ezechiel (Ezekiel)', filename: 'Ezechiel.json', chapters: 48, category: 'Prophets' },
+  { id: 'daniel', name: 'Daniel', filename: 'Daniel.json', chapters: 14, category: 'Prophets' },
+  { id: 'osee', name: 'Osee (Hosea)', filename: 'Osee.json', chapters: 14, category: 'Prophets' },
+  { id: 'joel', name: 'Joel', filename: 'Joel.json', chapters: 3, category: 'Prophets' },
+  { id: 'amos', name: 'Amos', filename: 'Amos.json', chapters: 9, category: 'Prophets' },
+  { id: 'abdias', name: 'Abdias (Obadiah)', filename: 'Abdias.json', chapters: 1, category: 'Prophets' },
+  { id: 'jonas', name: 'Jonas (Jonah)', filename: 'Jonas.json', chapters: 4, category: 'Prophets' },
+  { id: 'micheas', name: 'Micheas (Micah)', filename: 'Micheas.json', chapters: 7, category: 'Prophets' },
+  { id: 'nahum', name: 'Nahum', filename: 'Nahum.json', chapters: 3, category: 'Prophets' },
+  { id: 'habacuc', name: 'Habacuc (Habakkuk)', filename: 'Habacuc.json', chapters: 3, category: 'Prophets' },
+  { id: 'sophonias', name: 'Sophonias (Zephaniah)', filename: 'Sophonias.json', chapters: 3, category: 'Prophets' },
+  { id: 'aggeus', name: 'Aggeus (Haggai)', filename: 'Aggeus.json', chapters: 2, category: 'Prophets' },
+  { id: 'zacharias', name: 'Zacharias (Zechariah)', filename: 'Zacharias.json', chapters: 14, category: 'Prophets' },
+  { id: 'malachias', name: 'Malachias (Malachi)', filename: 'Malachias.json', chapters: 4, category: 'Prophets' },
+
+  // GOSPELS & ACTS
+  { id: 'matthew', name: 'Matthew', filename: 'Matthew.json', chapters: 28, category: 'Gospels & Acts' },
+  { id: 'mark', name: 'Mark', filename: 'Mark.json', chapters: 16, category: 'Gospels & Acts' },
+  { id: 'luke', name: 'Luke', filename: 'Luke.json', chapters: 24, category: 'Gospels & Acts' },
+  { id: 'john', name: 'John', filename: 'John.json', chapters: 21, category: 'Gospels & Acts' },
+  { id: 'acts', name: 'Acts of the Apostles', filename: 'Acts.json', chapters: 28, category: 'Gospels & Acts' },
+
+  // EPISTLES & REVELATION
+  { id: 'romans', name: 'Romans', filename: 'Romans.json', chapters: 16, category: 'Epistles & Revelation' },
+  { id: '1corinthians', name: '1 Corinthians', filename: '1 Corinthians.json', chapters: 16, category: 'Epistles & Revelation' },
+  { id: '2corinthians', name: '2 Corinthians', filename: '2 Corinthians.json', chapters: 13, category: 'Epistles & Revelation' },
+  { id: 'galatians', name: 'Galatians', filename: 'Galatians.json', chapters: 6, category: 'Epistles & Revelation' },
+  { id: 'ephesians', name: 'Ephesians', filename: 'Ephesians.json', chapters: 6, category: 'Epistles & Revelation' },
+  { id: 'philippians', name: 'Philippians', filename: 'Philippians.json', chapters: 4, category: 'Epistles & Revelation' },
+  { id: 'colossians', name: 'Colossians', filename: 'Colossians.json', chapters: 4, category: 'Epistles & Revelation' },
+  { id: '1thessalonians', name: '1 Thessalonians', filename: '1 Thessalonians.json', chapters: 5, category: 'Epistles & Revelation' },
+  { id: '2thessalonians', name: '2 Thessalonians', filename: '2 Thessalonians.json', chapters: 3, category: 'Epistles & Revelation' },
+  { id: '1timothy', name: '1 Timothy', filename: '1 Timothy.json', chapters: 6, category: 'Epistles & Revelation' },
+  { id: '2timothy', name: '2 Timothy', filename: '2 Timothy.json', chapters: 4, category: 'Epistles & Revelation' },
+  { id: 'titus', name: 'Titus', filename: 'Titus.json', chapters: 3, category: 'Epistles & Revelation' },
+  { id: 'philemon', name: 'Philemon', filename: 'Philemon.json', chapters: 1, category: 'Epistles & Revelation' },
+  { id: 'hebrews', name: 'Hebrews', filename: 'Hebrews.json', chapters: 13, category: 'Epistles & Revelation' },
+  { id: 'james', name: 'James', filename: 'James.json', chapters: 5, category: 'Epistles & Revelation' },
+  { id: '1peter', name: '1 Peter', filename: '1 Peter.json', chapters: 5, category: 'Epistles & Revelation' },
+  { id: '2peter', name: '2 Peter', filename: '2 Peter.json', chapters: 3, category: 'Epistles & Revelation' },
+  { id: '1john', name: '1 John', filename: '1 John.json', chapters: 5, category: 'Epistles & Revelation' },
+  { id: '2john', name: '2 John', filename: '2 John.json', chapters: 1, category: 'Epistles & Revelation' },
+  { id: '3john', name: '3 John', filename: '3 John.json', chapters: 1, category: 'Epistles & Revelation' },
+  { id: 'jude', name: 'Jude', filename: 'Jude.json', chapters: 1, category: 'Epistles & Revelation' },
+  { id: 'apocalypse', name: 'Apocalypse (Revelation)', filename: 'Apocalypse.json', chapters: 22, category: 'Epistles & Revelation' }
+];
+
+export const CATEGORIES = [
+  'Pentateuch',
+  'Historical',
+  'Wisdom',
+  'Prophets',
+  'Gospels & Acts',
+  'Epistles & Revelation'
+];

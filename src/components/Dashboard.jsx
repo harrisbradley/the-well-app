@@ -98,14 +98,18 @@ export default function Dashboard() {
             gap: '24px',
             textAlign: 'left',
           }}>
-            <div className="glass-panel-interactive" style={{ padding: '24px' }}>
+            <div 
+              className="glass-panel-interactive" 
+              style={{ padding: '24px' }}
+              onClick={() => navigate('/reader')}
+            >
               <h3 style={{ color: 'var(--color-sacred-gold)', marginBottom: '12px', fontSize: '18px', fontFamily: 'var(--font-serif)' }}>
                 Bible Reader
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-slate)', marginBottom: '16px' }}>
                 Browse all 73 Catholic books, select chapters, highlight verses, and anchor notes.
               </p>
-              <span style={{ fontSize: '12px', color: 'var(--color-sacred-gold)', fontWeight: 600 }}>COMING SOON</span>
+              <span style={{ fontSize: '12px', color: 'var(--color-sacred-gold)', fontWeight: 600 }}>ENTER READER →</span>
             </div>
 
             <div className="glass-panel-interactive" style={{ padding: '24px' }}>
