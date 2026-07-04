@@ -147,6 +147,7 @@ export default function Reader() {
   const [notes, setNotes] = useState([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [newNoteVerse, setNewNoteVerse] = useState(''); // Empty string means "Chapter Note"
+  const [activeSelectedVerse, setActiveSelectedVerse] = useState(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
@@ -223,6 +224,18 @@ export default function Reader() {
       }
     }
   }, [activeChapter, bookCache, ascensionMode, activeBook, activeTranslation]);
+
+  // Selected Verse Click Handlers
+  const handleVerseClick = (verseNum) => {
+    setActiveSelectedVerse(verseNum);
+    setNewNoteVerse(verseNum);
+    setNotesPanelOpen(true);
+  };
+
+  const clearSelectedVerse = () => {
+    setActiveSelectedVerse(null);
+    setNewNoteVerse('');
+  };
 
   // Firestore Real-Time Notes Listener
   useEffect(() => {
@@ -415,6 +428,8 @@ export default function Reader() {
   };
 
   const chaptersList = Array.from({ length: activeBook.chapters }, (_, i) => i + 1);
+
+  const versesWithNotes = notes.map(n => n.verse).filter(Boolean);
 
   // Ascension Press Bible URL generator
   const ascensionUrl = `https://app.ascensionpress.com/bible/books/${activeBook.ascensionCode}/${activeChapter}`;
@@ -1063,6 +1078,8 @@ export default function Reader() {
                           // Regex to split by HEADING, POETRY, and POETRY_INDENT blocks
                           const tokenRegex = /(\[HEADING\].*?\[\/HEADING\]|\[POETRY\].*?\[\/POETRY\]|\[POETRY_INDENT\].*?\[\/POETRY_INDENT\])/g;
                           const parts = text.split(tokenRegex);
+                          const isSelected = activeSelectedVerse === verseNum;
+                          const hasNote = versesWithNotes.includes(verseNum);
 
                           if (parts.length > 1) {
                             return (
@@ -1100,7 +1117,20 @@ export default function Reader() {
                                   } else {
                                     if (!part.trim()) return null;
                                     return (
-                                      <span key={idx} style={{ marginRight: '8px' }}>
+                                      <span 
+                                        key={idx}
+                                        onClick={() => handleVerseClick(verseNum)}
+                                        style={{ 
+                                          marginRight: '8px',
+                                          cursor: 'pointer',
+                                          background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
+                                          borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                          padding: '2px 4px',
+                                          borderRadius: '4px',
+                                          transition: 'background var(--transition-fast)',
+                                        }}
+                                        className="readable-verse"
+                                      >
                                         {idx === 0 && (
                                           <sup style={{
                                             fontFamily: 'var(--font-sans)',
@@ -1111,6 +1141,7 @@ export default function Reader() {
                                             verticalAlign: 'super',
                                           }}>
                                             {verseNum}
+                                            {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
                                           </sup>
                                         )}
                                         {part.trim()}
@@ -1123,7 +1154,20 @@ export default function Reader() {
                           }
 
                           return (
-                            <span key={verseNum} style={{ marginRight: '8px' }}>
+                            <span 
+                              key={verseNum} 
+                              onClick={() => handleVerseClick(verseNum)}
+                              style={{ 
+                                marginRight: '8px',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
+                                borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                padding: '2px 4px',
+                                borderRadius: '4px',
+                                transition: 'background var(--transition-fast)',
+                              }}
+                              className="readable-verse"
+                            >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
@@ -1133,6 +1177,7 @@ export default function Reader() {
                                 verticalAlign: 'super',
                               }}>
                                 {verseNum}
+                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
                               </sup>
                               {text}
                             </span>
@@ -1142,8 +1187,23 @@ export default function Reader() {
                         /* Render Static CDN Douay-Rheims Verses */
                         Object.entries(verses).map(([verseNum, text]) => {
                           const cleanText = text.replace(/^\*/, '');
+                          const isSelected = activeSelectedVerse === verseNum;
+                          const hasNote = versesWithNotes.includes(verseNum);
                           return (
-                            <span key={verseNum} style={{ marginRight: '8px' }}>
+                            <span 
+                              key={verseNum} 
+                              onClick={() => handleVerseClick(verseNum)}
+                              style={{ 
+                                marginRight: '8px',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
+                                borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                padding: '2px 4px',
+                                borderRadius: '4px',
+                                transition: 'background var(--transition-fast)',
+                              }}
+                              className="readable-verse"
+                            >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
@@ -1153,6 +1213,7 @@ export default function Reader() {
                                 verticalAlign: 'super',
                               }}>
                                 {verseNum}
+                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
                               </sup>
                               {cleanText}
                             </span>
@@ -1381,16 +1442,38 @@ export default function Reader() {
           background: 'rgba(8, 10, 12, 0.6)'
         }}>
           <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="e.g. 5, or leave blank"
-                value={newNoteVerse}
-                onChange={(e) => setNewNoteVerse(e.target.value.replace(/[^0-9]/g, ''))}
-                style={{ width: '130px', padding: '6px 10px', fontSize: '12px' }}
-              />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. 5, or leave blank"
+                  value={newNoteVerse}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setNewNoteVerse(val);
+                    setActiveSelectedVerse(val || null);
+                  }}
+                  style={{ width: '100px', padding: '6px 10px', fontSize: '12px' }}
+                />
+              </div>
+              {newNoteVerse && (
+                <button
+                  type="button"
+                  onClick={clearSelectedVerse}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-sacred-gold)',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Clear Selection
+                </button>
+              )}
             </div>
 
             <textarea
@@ -1417,6 +1500,12 @@ export default function Reader() {
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        .readable-verse {
+          transition: background-color 0.15s ease, border-bottom 0.15s ease;
+        }
+        .readable-verse:hover {
+          background-color: rgba(229, 193, 88, 0.08) !important;
         }
       `}</style>
     </div>
