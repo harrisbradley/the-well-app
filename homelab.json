@@ -1,0 +1,4 @@
+{
+  "build": "npm run build",
+  "start": "npx serve -s dist -l 4010"
+}
