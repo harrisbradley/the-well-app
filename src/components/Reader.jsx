@@ -76,6 +76,7 @@ export default function Reader() {
   const [transcriptionInput, setTranscriptionInput] = useState('');
   const [detectedCount, setDetectedCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'saved' | 'error'
+  const [saveError, setSaveError] = useState(null);
 
   // Annotations / Notes States
   const [notes, setNotes] = useState([]);
@@ -281,6 +282,7 @@ export default function Reader() {
     if (!transcriptionInput.trim()) return;
 
     setSaveStatus('saving');
+    setSaveError(null);
     const { verseMap, count } = parseBibleText(transcriptionInput);
 
     if (count === 0) {
@@ -308,6 +310,7 @@ export default function Reader() {
     } catch (err) {
       console.error("Error saving custom scriptures:", err);
       setSaveStatus('error');
+      setSaveError(err.message || String(err));
     }
   };
 
@@ -882,19 +885,27 @@ export default function Reader() {
                       required
                     />
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: detectedCount > 0 ? 'var(--color-sacred-gold)' : 'var(--text-slate)' }}>
-                        {detectedCount > 0 ? `✅ Detected ${detectedCount} verses` : 'Waiting for verse formatting...'}
-                      </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: detectedCount > 0 ? 'var(--color-sacred-gold)' : 'var(--text-slate)' }}>
+                          {detectedCount > 0 ? `✅ Detected ${detectedCount} verses` : 'Waiting for verse formatting...'}
+                        </span>
 
-                      <button
-                        className="btn btn-primary"
-                        type="submit"
-                        disabled={saveStatus === 'saving'}
-                        style={{ padding: '10px 24px', fontSize: '13px' }}
-                      >
-                        {saveStatus === 'saving' ? 'Saving...' : 'Save Private Copy'}
-                      </button>
+                        <button
+                          className="btn btn-primary"
+                          type="submit"
+                          disabled={saveStatus === 'saving'}
+                          style={{ padding: '10px 24px', fontSize: '13px' }}
+                        >
+                          {saveStatus === 'saving' ? 'Saving...' : 'Save Private Copy'}
+                        </button>
+                      </div>
+
+                      {saveStatus === 'error' && saveError && (
+                        <div style={{ color: '#FCA5A5', fontSize: '12px', textAlign: 'right', marginTop: '4px' }}>
+                          ❌ Error: {saveError}
+                        </div>
+                      )}
                     </div>
                   </form>
                 </div>

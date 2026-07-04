@@ -9,27 +9,26 @@ service cloud.firestore {
     
     // Notes collection
     match /notes/{noteId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
     // Wiki Entities collection
     match /entities/{entityId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
     // User Reading Progress collection
     match /userProgress/{progressId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
     // Custom Scriptures collection
     match /customScriptures/{scriptureId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
   }
 }
-
