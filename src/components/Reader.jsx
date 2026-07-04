@@ -204,8 +204,10 @@ export default function Reader() {
 
   // Firestore Private Custom Scripture Listener (for RSV-CE user copy)
   useEffect(() => {
+    // Clear previous chapter's content to avoid a flash of stale text while loading
+    setCustomVerses(null);
+
     if (!currentUser || !activeBook || activeTranslation !== 'rsv-ce') {
-      setCustomVerses(null);
       return;
     }
 
@@ -220,6 +222,7 @@ export default function Reader() {
       }
     }, (err) => {
       console.error("Firestore custom scriptures fetch error:", err);
+      setCustomVerses(null); // Ensure state is reset if fetch fails (e.g. permission or network issues)
     });
 
     return unsubscribe;
