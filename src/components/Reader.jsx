@@ -18,6 +18,12 @@ import { db } from '../firebase';
 // Helper function to parse pasted scripture text into structured verses
 function parseBibleText(rawText) {
   const verseMap = {};
+  
+  // Clean rawText: strip BibleGateway footnotes [a], [b], [aa] and cross-references (A), (B)
+  const cleanedText = rawText
+    .replace(/\[[a-z]+\]/g, '')   // removes lowercase letters in brackets
+    .replace(/\([A-Z]+\)/g, '');  // removes uppercase letters in parentheses
+
   // Matches verse markers like: "1 In the beginning", "[1] In the beginning", or "1. In the beginning"
   const regex = /(?:^|\s+)\[?(\d+)\]?\.?\s+([^]+?)(?=\s+\[?\d+\]?\.?\s+|$)/g;
   let match;
@@ -26,21 +32,21 @@ function parseBibleText(rawText) {
 
   // Find the index of the first match
   const tempRegex = new RegExp(regex);
-  const firstMatch = tempRegex.exec(rawText);
+  const firstMatch = tempRegex.exec(cleanedText);
   if (firstMatch) {
     firstIndex = firstMatch.index;
   }
 
   // If there is intro text before the first verse marker, treat it as Verse 1
   if (firstIndex > 0) {
-    const leadText = rawText.substring(0, firstIndex).trim().replace(/\s+/g, ' ');
+    const leadText = cleanedText.substring(0, firstIndex).trim().replace(/\s+/g, ' ');
     if (leadText) {
       verseMap["1"] = leadText;
       count++;
     }
   }
 
-  while ((match = regex.exec(rawText)) !== null) {
+  while ((match = regex.exec(cleanedText)) !== null) {
     const verseNum = match[1];
     const verseText = match[2].trim().replace(/\s+/g, ' ');
     // If we already assigned leading text to Verse 1, append this match
