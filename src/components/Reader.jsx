@@ -15,14 +15,51 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
+// Helper to identify and tag headings in the raw scripture text
+function tagHeadings(text) {
+  const lines = text.split('\n');
+  const processedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+
+    // Ignore lines that start with numbers (verses)
+    if (/^\d+/.test(trimmed)) return line;
+
+    // Ignore footnote markers like "2.4b"
+    if (/^\d+\.\d+/.test(trimmed)) return line;
+
+    // Check if it's title-case
+    const words = trimmed.split(/\s+/);
+    const isTitleCase = words.every(word => {
+      const cleanWord = word.replace(/[.,;!?]/g, '');
+      const lower = cleanWord.toLowerCase();
+      const smallWords = ['of', 'the', 'and', 'in', 'on', 'a', 'an', 'to', 'for', 'by', 'with', 'from', 'at', 'but', 'nor', 'yet', 'so', 'is', 'was', 'were', 'be', 'or', 'as'];
+      if (smallWords.includes(lower)) return true;
+      return /^[A-Z“\"'\u2018-\u201d]/.test(cleanWord);
+    });
+
+    const isShort = trimmed.length > 3 && trimmed.length < 80;
+    const hasNoEndingPunctuation = !/[.,;!?]$/.test(trimmed);
+
+    if (isShort && (isTitleCase || hasNoEndingPunctuation)) {
+      return `[HEADING]${trimmed}[/HEADING]`;
+    }
+    return line;
+  });
+  return processedLines.join('\n');
+}
+
 // Helper function to parse pasted scripture text into structured verses
 function parseBibleText(rawText) {
   const verseMap = {};
   
   // Clean rawText: strip BibleGateway footnotes [a], [b], [aa] and cross-references (A), (B)
-  const cleanedText = rawText
+  let cleanedText = rawText
     .replace(/\[[a-z]+\]/g, '')   // removes lowercase letters in brackets
     .replace(/\([A-Z]+\)/g, '');  // removes uppercase letters in parentheses
+
+  // Tag section headings in the text block before parsing out formatting newlines
+  cleanedText = tagHeadings(cleanedText);
 
   // Matches verse markers like: "1 In the beginning", "[1] In the beginning", or "1. In the beginning"
   const regex = /(?:^|\s+)\[?(\d+)\]?\.?\s+([^]+?)(?=\s+\[?\d+\]?\.?\s+|$)/g;
@@ -1000,21 +1037,71 @@ export default function Reader() {
                     }}>
                       {activeTranslation === 'rsv-ce' && customVerses ? (
                         /* Render Transcribed RSV-CE Verses */
-                        Object.entries(customVerses).map(([verseNum, text]) => (
-                          <span key={verseNum} style={{ marginRight: '8px' }}>
-                            <sup style={{
-                              fontFamily: 'var(--font-sans)',
-                              fontSize: '0.6em',
-                              fontWeight: 700,
-                              color: 'var(--color-sacred-gold)',
-                              marginRight: '4px',
-                              verticalAlign: 'super',
-                            }}>
-                              {verseNum}
-                            </sup>
-                            {text}
-                          </span>
-                        ))
+                        Object.entries(customVerses).map(([verseNum, text]) => {
+                          const headingRegex = /\[HEADING\](.*?)\[\/HEADING\]/g;
+                          const parts = text.split(headingRegex);
+
+                          if (parts.length > 1) {
+                            return (
+                              <span key={verseNum} style={{ display: 'inline' }}>
+                                {parts.map((part, idx) => {
+                                  if (idx % 2 === 1) {
+                                    // This is the heading text!
+                                    return (
+                                      <span key={idx} style={{ display: 'block', margin: '32px 0 16px 0', textAlign: 'left' }}>
+                                        <h3 style={{
+                                          fontFamily: 'var(--font-serif)',
+                                          fontSize: '20px',
+                                          color: 'var(--color-sacred-gold)',
+                                          fontWeight: 600,
+                                          margin: 0
+                                        }}>
+                                          {part}
+                                        </h3>
+                                      </span>
+                                    );
+                                  } else {
+                                    // This is standard verse text
+                                    if (!part.trim()) return null;
+                                    return (
+                                      <span key={idx} style={{ marginRight: '8px' }}>
+                                        {idx === 0 && (
+                                          <sup style={{
+                                            fontFamily: 'var(--font-sans)',
+                                            fontSize: '0.6em',
+                                            fontWeight: 700,
+                                            color: 'var(--color-sacred-gold)',
+                                            marginRight: '4px',
+                                            verticalAlign: 'super',
+                                          }}>
+                                            {verseNum}
+                                          </sup>
+                                        )}
+                                        {part.trim()}
+                                      </span>
+                                    );
+                                  }
+                                })}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span key={verseNum} style={{ marginRight: '8px' }}>
+                              <sup style={{
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: '0.6em',
+                                fontWeight: 700,
+                                color: 'var(--color-sacred-gold)',
+                                marginRight: '4px',
+                                verticalAlign: 'super',
+                              }}>
+                                {verseNum}
+                              </sup>
+                              {text}
+                            </span>
+                          );
+                        })
                       ) : (
                         /* Render Static CDN Douay-Rheims Verses */
                         Object.entries(verses).map(([verseNum, text]) => {
