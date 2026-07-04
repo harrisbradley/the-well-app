@@ -10,9 +10,114 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  doc 
+  doc,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
+
+// Helper to identify and tag headings and poetry/quotes in the raw scripture text
+function tagPoetryAndHeadings(text) {
+  const lines = text.split('\n');
+  const processedLines = lines.map((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+
+    // Ignore lines that start with numbers (verses)
+    if (/^\d+/.test(trimmed)) return line;
+
+    // Ignore footnote markers like "2.4b"
+    if (/^\d+\.\d+/.test(trimmed)) return line;
+
+    // Check if the raw line starts with spaces or tabs (poetry indents)
+    const hasLeadingIndent = /^\s{2,}/.test(line) || /^\t/.test(line);
+
+    // Check if it's title-case
+    const words = trimmed.split(/\s+/);
+    const isTitleCase = words.every(word => {
+      const cleanWord = word.replace(/[.,;!?]/g, '');
+      const lower = cleanWord.toLowerCase();
+      const smallWords = ['of', 'the', 'and', 'in', 'on', 'a', 'an', 'to', 'for', 'by', 'with', 'from', 'at', 'but', 'nor', 'yet', 'so', 'is', 'was', 'were', 'be', 'or', 'as'];
+      if (smallWords.includes(lower)) return true;
+      return /^[A-Z“\"'\u2018-\u201d]/.test(cleanWord);
+    });
+
+    const isShort = trimmed.length > 3 && trimmed.length < 80;
+
+    // 1. If it has a leading indent, tag it as indented poetry
+    if (hasLeadingIndent) {
+      return `[POETRY_INDENT]${trimmed}[/POETRY_INDENT]`;
+    }
+
+    // 2. If it is title case and short, it is a section heading
+    if (isShort && isTitleCase) {
+      return `[HEADING]${trimmed}[/HEADING]`;
+    }
+
+    // 3. If it is short, starts with a curly quote or ends with a curly quote, or is adjacent to indented poetry, tag it as poetry
+    const startsWithQuote = /^[“\"'\u2018]/.test(trimmed);
+    const endsWithQuote = /[”\"'\u2019]$/.test(trimmed);
+    
+    // Check neighbors for indentation to group the poem
+    const prevLine = lines[index - 1] || '';
+    const nextLine = lines[index + 1] || '';
+    const neighborsHaveIndent = /^\s{2,}/.test(prevLine) || /^\s{2,}/.test(nextLine) || /^\t/.test(prevLine) || /^\t/.test(nextLine);
+
+    if (isShort && (startsWithQuote || endsWithQuote || neighborsHaveIndent)) {
+      return `[POETRY]${trimmed}[/POETRY]`;
+    }
+
+    return line;
+  });
+  return processedLines.join('\n');
+}
+
+// Helper function to parse pasted scripture text into structured verses
+function parseBibleText(rawText) {
+  const verseMap = {};
+  
+  // Clean rawText: strip BibleGateway footnotes [a], [b], [aa] and cross-references (A), (B)
+  let cleanedText = rawText
+    .replace(/\[[a-z]+\]/g, '')   // removes lowercase letters in brackets
+    .replace(/\([A-Z]+\)/g, '');  // removes uppercase letters in parentheses
+
+  // Tag section headings and poetry quotes in the text block before parsing out formatting newlines
+  cleanedText = tagPoetryAndHeadings(cleanedText);
+
+  // Matches verse markers like: "1 In the beginning", "[1] In the beginning", or "1. In the beginning"
+  const regex = /(?:^|\s+)\[?(\d+)\]?\.?\s+([^]+?)(?=\s+\[?\d+\]?\.?\s+|$)/g;
+  let match;
+  let count = 0;
+  let firstIndex = -1;
+
+  // Find the index of the first match
+  const tempRegex = new RegExp(regex);
+  const firstMatch = tempRegex.exec(cleanedText);
+  if (firstMatch) {
+    firstIndex = firstMatch.index;
+  }
+
+  // If there is intro text before the first verse marker, treat it as Verse 1
+  if (firstIndex > 0) {
+    const leadText = cleanedText.substring(0, firstIndex).trim().replace(/\s+/g, ' ');
+    if (leadText) {
+      verseMap["1"] = leadText;
+      count++;
+    }
+  }
+
+  while ((match = regex.exec(cleanedText)) !== null) {
+    const verseNum = match[1];
+    const verseText = match[2].trim().replace(/\s+/g, ' ');
+    // If we already assigned leading text to Verse 1, append this match
+    if (verseNum === "1" && verseMap["1"]) {
+      verseMap["1"] = (verseMap["1"] + " " + verseText).trim();
+    } else {
+      verseMap[verseNum] = verseText;
+      count++;
+    }
+  }
+  return { verseMap, count };
+}
 
 export default function Reader() {
   const { currentUser, logout } = useAuth();
@@ -28,6 +133,16 @@ export default function Reader() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Translation Selection
+  const [activeTranslation, setActiveTranslation] = useState('douay-rheims'); // 'douay-rheims' or 'rsv-ce'
+  const [customVerses, setCustomVerses] = useState(null); // Holds privately transcribed RSV-CE chapter data
+  
+  // Transcription Input Form States
+  const [transcriptionInput, setTranscriptionInput] = useState('');
+  const [detectedCount, setDetectedCount] = useState(0);
+  const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'saved' | 'error'
+  const [saveError, setSaveError] = useState(null);
+
   // Annotations / Notes States
   const [notes, setNotes] = useState([]);
   const [newNoteText, setNewNoteText] = useState('');
@@ -40,7 +155,7 @@ export default function Reader() {
   const [notesPanelOpen, setNotesPanelOpen] = useState(true);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
-  const [ascensionMode, setAscensionMode] = useState(true); // Toggle Ascension Press Companion Mode (Default to true)
+  const [ascensionMode, setAscensionMode] = useState(true); // Default to Ascension Companion Mode
 
   // Category navigation state
   const [expandedCategories, setExpandedCategories] = useState({
@@ -62,9 +177,9 @@ export default function Reader() {
     }));
   };
 
-  // Fetch and Cache Scripture JSON
+  // Fetch and Cache Scripture JSON (for Douay-Rheims)
   useEffect(() => {
-    if (!activeBook || ascensionMode) return; // Skip fetching text if in Ascension mode
+    if (!activeBook || ascensionMode || activeTranslation === 'rsv-ce') return;
     const cacheKey = activeBook.id;
 
     if (bookCache[cacheKey]) {
@@ -95,11 +210,11 @@ export default function Reader() {
         setError('Could not download scripture text. Please check your internet connection.');
         setLoading(false);
       });
-  }, [activeBook, activeChapter, ascensionMode]);
+  }, [activeBook, activeChapter, ascensionMode, activeTranslation]);
 
   // Update local verses from cache in JSON mode when chapter shifts
   useEffect(() => {
-    if (ascensionMode) return;
+    if (ascensionMode || activeTranslation === 'rsv-ce') return;
     const cacheKey = activeBook.id;
     if (bookCache[cacheKey]) {
       setVerses(bookCache[cacheKey][activeChapter] || {});
@@ -107,7 +222,7 @@ export default function Reader() {
         scrollContainerRef.current.scrollTop = 0;
       }
     }
-  }, [activeChapter, bookCache, ascensionMode, activeBook]);
+  }, [activeChapter, bookCache, ascensionMode, activeBook, activeTranslation]);
 
   // Firestore Real-Time Notes Listener
   useEffect(() => {
@@ -145,6 +260,32 @@ export default function Reader() {
 
     return unsubscribe;
   }, [currentUser, activeBook, activeChapter]);
+
+  // Firestore Private Custom Scripture Listener (for RSV-CE user copy)
+  useEffect(() => {
+    // Clear previous chapter's content to avoid a flash of stale text while loading
+    setCustomVerses(null);
+
+    if (!currentUser || !activeBook || activeTranslation !== 'rsv-ce') {
+      return;
+    }
+
+    const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}`;
+    const docRef = doc(db, 'customScriptures', docId);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setCustomVerses(docSnap.data().verses || {});
+      } else {
+        setCustomVerses(null);
+      }
+    }, (err) => {
+      console.error("Firestore custom scriptures fetch error:", err);
+      setCustomVerses(null); // Ensure state is reset if fetch fails (e.g. permission or network issues)
+    });
+
+    return unsubscribe;
+  }, [currentUser, activeBook, activeChapter, activeTranslation]);
 
   // Note CRUD handlers
   const handleAddNote = async (e) => {
@@ -193,6 +334,51 @@ export default function Reader() {
       await deleteDoc(noteDocRef);
     } catch (err) {
       console.error("Error deleting note:", err);
+    }
+  };
+
+  // Custom Scripture Transcribing Handlers
+  const handleInputChange = (e) => {
+    const text = e.target.value;
+    setTranscriptionInput(text);
+    const { count } = parseBibleText(text);
+    setDetectedCount(count);
+  };
+
+  const handleSaveTranscription = async (e) => {
+    e.preventDefault();
+    if (!transcriptionInput.trim()) return;
+
+    setSaveStatus('saving');
+    setSaveError(null);
+    const { verseMap, count } = parseBibleText(transcriptionInput);
+
+    if (count === 0) {
+      alert("No verse numbers detected. Make sure the pasted text has numbers preceding the verses (e.g., '1 In the beginning...').");
+      setSaveStatus(null);
+      return;
+    }
+
+    try {
+      const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}`;
+      const docRef = doc(db, 'customScriptures', docId);
+
+      await setDoc(docRef, {
+        userId: currentUser.uid,
+        bookId: activeBook.id,
+        chapter: activeChapter,
+        verses: verseMap,
+        createdAt: Date.now()
+      });
+
+      setSaveStatus('saved');
+      setTranscriptionInput('');
+      setDetectedCount(0);
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch (err) {
+      console.error("Error saving custom scriptures:", err);
+      setSaveStatus('error');
+      setSaveError(err.message || String(err));
     }
   };
 
@@ -480,9 +666,32 @@ export default function Reader() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Font Sizers */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Translation Selection Selector */}
               {!ascensionMode && (
+                <select
+                  value={activeTranslation}
+                  onChange={(e) => setActiveTranslation(e.target.value)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    borderRadius: '6px',
+                    color: 'var(--color-sacred-gold)',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontFamily: 'var(--font-sans)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="douay-rheims" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>Douay-Rheims (CDN)</option>
+                  <option value="rsv-ce" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>RSV-CE (My Copy)</option>
+                </select>
+              )}
+
+              {/* Font Sizers */}
+              {!ascensionMode && (activeTranslation === 'douay-rheims' || customVerses) && (
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <button 
                     onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
@@ -708,53 +917,68 @@ export default function Reader() {
               </div>
             </div>
           ) : (
-            /* Mode A: Default Douay-Rheims Scripture Reader Column */
+            /* Mode A: Default Scripture Reader View */
             <div style={{
               maxWidth: '680px',
               width: '100%',
             }}>
-              {loading && (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '200px',
-                  gap: '16px',
-                }}>
-                  <div className="pulse-gold" style={{
-                    width: '50px',
-                    height: '50px',
-                    borderRadius: '50%',
-                    border: '2px solid var(--color-sacred-gold)',
-                    borderTopColor: 'transparent',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
-                </div>
-              )}
-
-              {error && !loading && (
-                <div className="glass-panel" style={{
-                  padding: '24px',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  background: 'rgba(239, 68, 68, 0.05)',
-                  color: '#FCA5A5',
-                  textAlign: 'center',
+              {/* Check if in RSV-CE mode and there is NO custom scripture transcribed yet */}
+              {activeTranslation === 'rsv-ce' && !customVerses ? (
+                /* TRANSCRIPTION BOX EDITOR */
+                <div className="glass-panel fade-in" style={{
+                  padding: '32px',
+                  background: 'rgba(20, 26, 32, 0.6)',
+                  border: '1px solid rgba(229, 193, 88, 0.15)',
                   margin: '40px 0',
                 }}>
-                  <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => handleBookChange(activeBook)}
-                    style={{ padding: '8px 16px', fontSize: '13px' }}
-                  >
-                    Retry Load
-                  </button>
-                </div>
-              )}
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--color-sacred-gold)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Transcribe Chapter Text
+                    </span>
+                    <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '24px', color: 'var(--text-ivory)', marginTop: '4px' }}>
+                      RSV-CE: {activeBook.name} {activeChapter}
+                    </h2>
+                    <p style={{ fontSize: '13px', color: 'var(--text-slate)', marginTop: '8px', lineHeight: 1.5 }}>
+                      No private scripture copy saved for this chapter. Paste the text from your Bible window below. We will parse the verses and save it securely in your Firebase database.
+                    </p>
+                  </div>
 
-              {!loading && !error && (
+                  <form onSubmit={handleSaveTranscription} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <textarea
+                      className="input-field"
+                      placeholder={`Paste RSV-CE ${activeBook.name} ${activeChapter} verses here...\n\nExample:\n1 In the beginning God created...\n2 And the earth was void...`}
+                      value={transcriptionInput}
+                      onChange={handleInputChange}
+                      style={{ minHeight: '220px', fontSize: '13px', fontFamily: 'var(--font-serif)', lineHeight: 1.6, resize: 'vertical' }}
+                      required
+                    />
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: detectedCount > 0 ? 'var(--color-sacred-gold)' : 'var(--text-slate)' }}>
+                          {detectedCount > 0 ? `✅ Detected ${detectedCount} verses` : 'Waiting for verse formatting...'}
+                        </span>
+
+                        <button
+                          className="btn btn-primary"
+                          type="submit"
+                          disabled={saveStatus === 'saving'}
+                          style={{ padding: '10px 24px', fontSize: '13px' }}
+                        >
+                          {saveStatus === 'saving' ? 'Saving...' : 'Save Private Copy'}
+                        </button>
+                      </div>
+
+                      {saveStatus === 'error' && saveError && (
+                        <div style={{ color: '#FCA5A5', fontSize: '12px', textAlign: 'right', marginTop: '4px' }}>
+                          ❌ Error: {saveError}
+                        </div>
+                      )}
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                /* RENDER STANDARD BIBLE TEXT */
                 <div className="fade-in" style={{ paddingBottom: '120px' }}>
                   <div style={{ textAlign: 'center', marginBottom: '48px' }}>
                     <p style={{
@@ -765,7 +989,7 @@ export default function Reader() {
                       letterSpacing: '0.12em',
                       marginBottom: '8px',
                     }}>
-                      {activeBook.name}
+                      {activeBook.name} ({activeTranslation === 'rsv-ce' ? 'RSV-CE Copy' : 'Douay-Rheims'})
                     </p>
                     <h1 style={{
                       fontFamily: 'var(--font-serif)',
@@ -784,32 +1008,197 @@ export default function Reader() {
                     }} />
                   </div>
 
-                  <div style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: `${fontSize}px`,
-                    lineHeight: '1.85',
-                    color: '#ECE8E1',
-                    textAlign: 'justify',
-                  }}>
-                    {Object.entries(verses).map(([verseNum, text]) => {
-                      const cleanText = text.replace(/^\*/, '');
-                      return (
-                        <span key={verseNum} style={{ marginRight: '8px' }}>
-                          <sup style={{
-                            fontFamily: 'var(--font-sans)',
-                            fontSize: '0.6em',
-                            fontWeight: 700,
-                            color: 'var(--color-sacred-gold)',
-                            marginRight: '4px',
-                            verticalAlign: 'super',
-                          }}>
-                            {verseNum}
-                          </sup>
-                          {cleanText}
-                        </span>
-                      );
-                    })}
-                  </div>
+                  {loading && (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: '200px',
+                      gap: '16px',
+                    }}>
+                      <div className="pulse-gold" style={{
+                        width: '50px',
+                        height: '50px',
+                        borderRadius: '50%',
+                        border: '2px solid var(--color-sacred-gold)',
+                        borderTopColor: 'transparent',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
+                    </div>
+                  )}
+
+                  {error && !loading && (
+                    <div className="glass-panel" style={{
+                      padding: '24px',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.05)',
+                      color: '#FCA5A5',
+                      textAlign: 'center',
+                      margin: '40px 0',
+                    }}>
+                      <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleBookChange(activeBook)}
+                        style={{ padding: '8px 16px', fontSize: '13px' }}
+                      >
+                        Retry Load
+                      </button>
+                    </div>
+                  )}
+
+                  {!loading && !error && (
+                    <div style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: `${fontSize}px`,
+                      lineHeight: '1.85',
+                      color: '#ECE8E1',
+                      textAlign: 'justify',
+                    }}>
+                      {activeTranslation === 'rsv-ce' && customVerses ? (
+                        /* Render Transcribed RSV-CE Verses */
+                        Object.entries(customVerses).map(([verseNum, text]) => {
+                          // Regex to split by HEADING, POETRY, and POETRY_INDENT blocks
+                          const tokenRegex = /(\[HEADING\].*?\[\/HEADING\]|\[POETRY\].*?\[\/POETRY\]|\[POETRY_INDENT\].*?\[\/POETRY_INDENT\])/g;
+                          const parts = text.split(tokenRegex);
+
+                          if (parts.length > 1) {
+                            return (
+                              <span key={verseNum} style={{ display: 'inline' }}>
+                                {parts.map((part, idx) => {
+                                  if (part.startsWith('[HEADING]')) {
+                                    const content = part.replace('[HEADING]', '').replace('[/HEADING]', '');
+                                    return (
+                                      <span key={idx} style={{ display: 'block', margin: '32px 0 16px 0', textAlign: 'left' }}>
+                                        <h3 style={{
+                                          fontFamily: 'var(--font-serif)',
+                                          fontSize: '20px',
+                                          color: 'var(--color-sacred-gold)',
+                                          fontWeight: 600,
+                                          margin: 0
+                                        }}>
+                                          {content}
+                                        </h3>
+                                      </span>
+                                    );
+                                  } else if (part.startsWith('[POETRY_INDENT]')) {
+                                    const content = part.replace('[POETRY_INDENT]', '').replace('[/POETRY_INDENT]', '');
+                                    return (
+                                      <span key={idx} style={{ display: 'block', paddingLeft: '48px', fontStyle: 'italic', margin: '6px 0', color: '#E2DCD2' }}>
+                                        {content}
+                                      </span>
+                                    );
+                                  } else if (part.startsWith('[POETRY]')) {
+                                    const content = part.replace('[POETRY]', '').replace('[/POETRY]', '');
+                                    return (
+                                      <span key={idx} style={{ display: 'block', paddingLeft: '24px', fontStyle: 'italic', margin: '6px 0', color: '#E2DCD2' }}>
+                                        {content}
+                                      </span>
+                                    );
+                                  } else {
+                                    if (!part.trim()) return null;
+                                    return (
+                                      <span key={idx} style={{ marginRight: '8px' }}>
+                                        {idx === 0 && (
+                                          <sup style={{
+                                            fontFamily: 'var(--font-sans)',
+                                            fontSize: '0.6em',
+                                            fontWeight: 700,
+                                            color: 'var(--color-sacred-gold)',
+                                            marginRight: '4px',
+                                            verticalAlign: 'super',
+                                          }}>
+                                            {verseNum}
+                                          </sup>
+                                        )}
+                                        {part.trim()}
+                                      </span>
+                                    );
+                                  }
+                                })}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span key={verseNum} style={{ marginRight: '8px' }}>
+                              <sup style={{
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: '0.6em',
+                                fontWeight: 700,
+                                color: 'var(--color-sacred-gold)',
+                                marginRight: '4px',
+                                verticalAlign: 'super',
+                              }}>
+                                {verseNum}
+                              </sup>
+                              {text}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        /* Render Static CDN Douay-Rheims Verses */
+                        Object.entries(verses).map(([verseNum, text]) => {
+                          const cleanText = text.replace(/^\*/, '');
+                          return (
+                            <span key={verseNum} style={{ marginRight: '8px' }}>
+                              <sup style={{
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: '0.6em',
+                                fontWeight: 700,
+                                color: 'var(--color-sacred-gold)',
+                                marginRight: '4px',
+                                verticalAlign: 'super',
+                              }}>
+                                {verseNum}
+                              </sup>
+                              {cleanText}
+                            </span>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  {/* Transcribed Text Controls (Edit/Delete Option) */}
+                  {activeTranslation === 'rsv-ce' && customVerses && !loading && (
+                    <div style={{ marginTop: '56px', display: 'flex', gap: '16px', justifyContent: 'center', borderTop: '1px solid rgba(229, 193, 88, 0.1)', paddingTop: '24px' }}>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          // Compile verses back into plaintext format for editing
+                          let compiled = "";
+                          Object.entries(customVerses).sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10)).forEach(([num, text]) => {
+                            compiled += `${num} ${text}\n`;
+                          });
+                          setTranscriptionInput(compiled);
+                          setDetectedCount(Object.keys(customVerses).length);
+                          setCustomVerses(null); // Triggers editor display
+                        }}
+                        style={{ fontSize: '12px', padding: '6px 14px' }}
+                      >
+                        ✏️ Edit Chapter Text
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={async () => {
+                          if (window.confirm("Are you sure you want to delete your privately saved text for this chapter?")) {
+                            try {
+                              const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}`;
+                              await deleteDoc(doc(db, 'customScriptures', docId));
+                            } catch (err) {
+                              console.error("Error deleting custom scripture:", err);
+                            }
+                          }
+                        }}
+                        style={{ fontSize: '12px', padding: '6px 14px', color: '#FCA5A5', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                      >
+                        🗑️ Delete Private Copy
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -908,7 +1297,7 @@ export default function Reader() {
                   }}
                 >
                   {/* Note Header Metadata */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center' }}>
                     <span style={{
                       fontSize: '11px',
                       color: 'var(--color-sacred-gold)',
