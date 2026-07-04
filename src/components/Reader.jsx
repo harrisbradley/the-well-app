@@ -40,7 +40,7 @@ export default function Reader() {
   const [notesPanelOpen, setNotesPanelOpen] = useState(true);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
-  const [ascensionMode, setAscensionMode] = useState(true); // Toggle Ascension Press Companion Mode (Default to true now!)
+  const [ascensionMode, setAscensionMode] = useState(true); // Toggle Ascension Press Companion Mode (Default to true)
 
   // Category navigation state
   const [expandedCategories, setExpandedCategories] = useState({
@@ -481,7 +481,7 @@ export default function Reader() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Font Sizers - Only visible when reading inline text */}
+              {/* Font Sizers */}
               {!ascensionMode && (
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <button 
@@ -609,196 +609,209 @@ export default function Reader() {
           ref={scrollContainerRef}
           style={{
             flex: 1,
-            overflow: 'hidden',
+            overflowY: 'auto',
+            padding: distractionFree ? '64px 24px' : '40px 24px',
             display: 'flex',
             flexDirection: 'column',
+            alignItems: 'center',
             background: distractionFree ? '#06080A' : 'var(--bg-midnight)',
             transition: 'background-color var(--transition-slow)',
+            width: '100%',
           }}
         >
           {ascensionMode ? (
-            /* Mode B: Embedded Ascension Press Iframe View */
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
+            /* Mode B: Clean Ascension Press Launcher Dashboard */
+            <div className="fade-in" style={{
+              maxWidth: '600px',
               width: '100%',
-              height: '100%',
+              textAlign: 'center',
+              paddingTop: '40px',
+              paddingBottom: '80px',
             }}>
-              {/* Fallback & Helper ribbon above the Iframe */}
               <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
                 background: 'rgba(229, 193, 88, 0.08)',
-                borderBottom: '1px solid rgba(229, 193, 88, 0.15)',
-                padding: '10px 24px',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                fontSize: '12px',
-                color: 'var(--text-slate)',
+                justifyContent: 'center',
+                margin: '0 auto 24px auto',
+                border: '1px solid rgba(229, 193, 88, 0.2)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <span>Reading: <strong>{activeBook.name} {activeChapter}</strong></span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      onClick={prevChapter} 
-                      disabled={activeChapter === '1'}
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: 'var(--text-ivory)', padding: '2px 8px', cursor: 'pointer' }}
-                    >
-                      ◀ Prev
-                    </button>
-                    <button 
-                      onClick={nextChapter} 
-                      disabled={parseInt(activeChapter, 10) >= activeBook.chapters}
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: 'var(--text-ivory)', padding: '2px 8px', cursor: 'pointer' }}
-                    >
-                      Next ▶
-                    </button>
-                  </div>
-                </div>
-                
-                <span>
-                  Frame blocked or blank?{' '}
-                  <a 
-                    href={ascensionUrl} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    style={{ color: 'var(--color-sacred-gold)', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Open in New Tab ↗
-                  </a>
-                </span>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-sacred-gold)" strokeWidth="1.2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
 
-              {/* Embedded Web Frame */}
-              <div style={{ flex: 1, position: 'relative', background: '#080A0C' }}>
-                <iframe 
-                  src={ascensionUrl} 
-                  title={`Ascension Press Bible - ${activeBook.name} ${activeChapter}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    background: '#080A0C',
-                  }}
-                  allow="clipboard-write"
-                />
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', color: 'var(--color-sacred-gold)', marginBottom: '12px' }}>
+                Ascension Companion
+              </h1>
+              <p style={{ color: 'var(--text-slate)', fontSize: '15px', lineHeight: 1.6, marginBottom: '40px' }}>
+                Because the Ascension Press website has strict security rules blocking in-app embedding, you can open the active chapter directly in a pinned side-tab. Any notes you log on the right side will automatically bind to this scripture reference!
+              </p>
+
+              {/* Big Launcher Button */}
+              <a 
+                href={ascensionUrl} 
+                target="_blank" 
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '18px 36px',
+                  fontSize: '16px',
+                  borderRadius: 'var(--radius-md)',
+                  textDecoration: 'none',
+                  boxShadow: '0 8px 24px rgba(229, 193, 88, 0.2)',
+                  marginBottom: '48px',
+                }}
+              >
+                <span>Open {activeBook.name} {activeChapter} on Ascension ↗</span>
+              </a>
+
+              {/* Chapter Steppers */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '40px' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={prevChapter}
+                  disabled={activeChapter === '1'}
+                  style={{ opacity: activeChapter === '1' ? 0.4 : 1 }}
+                >
+                  ← Previous Chapter
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={nextChapter}
+                  disabled={parseInt(activeChapter, 10) >= activeBook.chapters}
+                  style={{ opacity: parseInt(activeChapter, 10) >= activeBook.chapters ? 0.4 : 1 }}
+                >
+                  Next Chapter →
+                </button>
+              </div>
+
+              {/* Tiling Tip */}
+              <div className="glass-panel" style={{
+                padding: '20px',
+                background: 'rgba(20, 26, 32, 0.4)',
+                textAlign: 'left',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+              }}>
+                <h4 style={{ fontSize: '13px', color: 'var(--text-ivory)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  💡 Homelab Tip: Windows Tiling
+                </h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-slate)', lineHeight: 1.5 }}>
+                  Snap your browser windows side-by-side! Click and drag the Ascension Press tab to the left edge of your monitor, and keep The Well App on the right side. This aligns your notes stack perfectly with your reading!
+                </p>
               </div>
             </div>
           ) : (
             /* Mode A: Default Douay-Rheims Scripture Reader Column */
-            <div 
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: distractionFree ? '64px 24px' : '40px 24px',
-                display: 'flex',
-                justifyContent: 'center',
-                width: '100%',
-              }}
-            >
-              <div style={{
-                maxWidth: '680px',
-                width: '100%',
-              }}>
-                {loading && (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: '200px',
-                    gap: '16px',
-                  }}>
-                    <div className="pulse-gold" style={{
-                      width: '50px',
-                      height: '50px',
-                      borderRadius: '50%',
-                      border: '2px solid var(--color-sacred-gold)',
-                      borderTopColor: 'transparent',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
-                  </div>
-                )}
+            <div style={{
+              maxWidth: '680px',
+              width: '100%',
+            }}>
+              {loading && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '200px',
+                  gap: '16px',
+                }}>
+                  <div className="pulse-gold" style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    border: '2px solid var(--color-sacred-gold)',
+                    borderTopColor: 'transparent',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <p style={{ color: 'var(--text-slate)', fontSize: '14px' }}>Downloading scriptures...</p>
+                </div>
+              )}
 
-                {error && !loading && (
-                  <div className="glass-panel" style={{
-                    padding: '24px',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    background: 'rgba(239, 68, 68, 0.05)',
-                    color: '#FCA5A5',
-                    textAlign: 'center',
-                    margin: '40px 0',
-                  }}>
-                    <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => handleBookChange(activeBook)}
-                      style={{ padding: '8px 16px', fontSize: '13px' }}
-                    >
-                      Retry Load
-                    </button>
-                  </div>
-                )}
+              {error && !loading && (
+                <div className="glass-panel" style={{
+                  padding: '24px',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  color: '#FCA5A5',
+                  textAlign: 'center',
+                  margin: '40px 0',
+                }}>
+                  <p style={{ fontSize: '15px', marginBottom: '16px' }}>{error}</p>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleBookChange(activeBook)}
+                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                  >
+                    Retry Load
+                  </button>
+                </div>
+              )}
 
-                {!loading && !error && (
-                  <div className="fade-in" style={{ paddingBottom: '120px' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-                      <p style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontSize: '11px',
-                        color: 'var(--color-sacred-gold)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.12em',
-                        marginBottom: '8px',
-                      }}>
-                        {activeBook.name}
-                      </p>
-                      <h1 style={{
-                        fontFamily: 'var(--font-serif)',
-                        fontSize: '44px',
-                        color: 'var(--text-ivory)',
-                        fontWeight: 600,
-                      }}>
-                        Chapter {activeChapter}
-                      </h1>
-                      <hr style={{
-                        width: '40px',
-                        margin: '16px auto 0 auto',
-                        border: 'none',
-                        borderTop: '2px solid var(--color-sacred-gold)',
-                        opacity: 0.7,
-                      }} />
-                    </div>
-
-                    <div style={{
-                      fontFamily: 'var(--font-serif)',
-                      fontSize: `${fontSize}px`,
-                      lineHeight: '1.85',
-                      color: '#ECE8E1',
-                      textAlign: 'justify',
+              {!loading && !error && (
+                <div className="fade-in" style={{ paddingBottom: '120px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+                    <p style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '11px',
+                      color: 'var(--color-sacred-gold)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.12em',
+                      marginBottom: '8px',
                     }}>
-                      {Object.entries(verses).map(([verseNum, text]) => {
-                        const cleanText = text.replace(/^\*/, '');
-                        return (
-                          <span key={verseNum} style={{ marginRight: '8px' }}>
-                            <sup style={{
-                              fontFamily: 'var(--font-sans)',
-                              fontSize: '0.6em',
-                              fontWeight: 700,
-                              color: 'var(--color-sacred-gold)',
-                              marginRight: '4px',
-                              verticalAlign: 'super',
-                            }}>
-                              {verseNum}
-                            </sup>
-                            {cleanText}
-                          </span>
-                        );
-                      })}
-                    </div>
+                      {activeBook.name}
+                    </p>
+                    <h1 style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '44px',
+                      color: 'var(--text-ivory)',
+                      fontWeight: 600,
+                    }}>
+                      Chapter {activeChapter}
+                    </h1>
+                    <hr style={{
+                      width: '40px',
+                      margin: '16px auto 0 auto',
+                      border: 'none',
+                      borderTop: '2px solid var(--color-sacred-gold)',
+                      opacity: 0.7,
+                    }} />
                   </div>
-                )}
-              </div>
+
+                  <div style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: `${fontSize}px`,
+                    lineHeight: '1.85',
+                    color: '#ECE8E1',
+                    textAlign: 'justify',
+                  }}>
+                    {Object.entries(verses).map(([verseNum, text]) => {
+                      const cleanText = text.replace(/^\*/, '');
+                      return (
+                        <span key={verseNum} style={{ marginRight: '8px' }}>
+                          <sup style={{
+                            fontFamily: 'var(--font-sans)',
+                            fontSize: '0.6em',
+                            fontWeight: 700,
+                            color: 'var(--color-sacred-gold)',
+                            marginRight: '4px',
+                            verticalAlign: 'super',
+                          }}>
+                            {verseNum}
+                          </sup>
+                          {cleanText}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
