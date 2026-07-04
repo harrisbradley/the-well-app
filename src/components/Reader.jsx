@@ -119,6 +119,69 @@ function parseBibleText(rawText) {
   return { verseMap, count };
 }
 
+// Helper to format an array of selected verse numbers into a readable range string (e.g. "5-7, 9")
+function formatVerseRange(versesArray) {
+  if (!versesArray || versesArray.length === 0) return '';
+  const sorted = [...versesArray].map(v => parseInt(v, 10)).sort((a, b) => a - b);
+  
+  const ranges = [];
+  let start = sorted[0];
+  let end = sorted[0];
+  
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === end + 1) {
+      end = sorted[i];
+    } else {
+      if (start === end) {
+        ranges.push(`${start}`);
+      } else {
+        ranges.push(`${start}-${end}`);
+      }
+      start = sorted[i];
+      end = sorted[i];
+    }
+  }
+  if (start === end) {
+    ranges.push(`${start}`);
+  } else {
+    ranges.push(`${start}-${end}`);
+  }
+  return ranges.join(', ');
+}
+
+// Helper to parse a range string (e.g. "5-7, 9") back into an array of individual verse string keys
+function parseVerseRange(rangeStr, maxVerses = 200) {
+  if (!rangeStr) return [];
+  const versesSet = new Set();
+  const parts = String(rangeStr).split(',');
+  
+  parts.forEach(part => {
+    const cleanPart = part.trim();
+    if (!cleanPart) return;
+    
+    if (cleanPart.includes('-')) {
+      const [startStr, endStr] = cleanPart.split('-');
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      if (!isNaN(start) && !isNaN(end)) {
+        const min = Math.min(start, end);
+        const max = Math.max(start, end);
+        // Safety guard against massive ranges (e.g. 1-100000) from typos
+        for (let i = min; i <= Math.min(max, maxVerses); i++) {
+          versesSet.add(String(i));
+        }
+      }
+    } else {
+      const val = parseInt(cleanPart, 10);
+      if (!isNaN(val)) {
+        versesSet.add(String(val));
+      }
+    }
+  });
+  
+  return Array.from(versesSet);
+}
+
 export default function Reader() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -147,7 +210,7 @@ export default function Reader() {
   const [notes, setNotes] = useState([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [newNoteVerse, setNewNoteVerse] = useState(''); // Empty string means "Chapter Note"
-  const [activeSelectedVerse, setActiveSelectedVerse] = useState(null);
+  const [activeSelectedVerses, setActiveSelectedVerses] = useState([]);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
@@ -226,14 +289,40 @@ export default function Reader() {
   }, [activeChapter, bookCache, ascensionMode, activeBook, activeTranslation]);
 
   // Selected Verse Click Handlers
-  const handleVerseClick = (verseNum) => {
-    setActiveSelectedVerse(verseNum);
-    setNewNoteVerse(verseNum);
+  const handleVerseClick = (e, verseNum) => {
+    let newSelection = [];
+    
+    if (e.shiftKey && activeSelectedVerses.length > 0) {
+      // Shift key range select
+      const lastSelected = parseInt(activeSelectedVerses[activeSelectedVerses.length - 1], 10);
+      const clicked = parseInt(verseNum, 10);
+      const min = Math.min(lastSelected, clicked);
+      const max = Math.max(lastSelected, clicked);
+      
+      const range = [];
+      for (let i = min; i <= max; i++) {
+        range.push(String(i));
+      }
+      newSelection = Array.from(new Set([...activeSelectedVerses, ...range]));
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl / Cmd key toggle select
+      if (activeSelectedVerses.includes(verseNum)) {
+        newSelection = activeSelectedVerses.filter(v => v !== verseNum);
+      } else {
+        newSelection = [...activeSelectedVerses, verseNum];
+      }
+    } else {
+      // Standard single click select
+      newSelection = [verseNum];
+    }
+    
+    setActiveSelectedVerses(newSelection);
+    setNewNoteVerse(formatVerseRange(newSelection));
     setNotesPanelOpen(true);
   };
 
   const clearSelectedVerse = () => {
-    setActiveSelectedVerse(null);
+    setActiveSelectedVerses([]);
     setNewNoteVerse('');
   };
 
@@ -429,7 +518,17 @@ export default function Reader() {
 
   const chaptersList = Array.from({ length: activeBook.chapters }, (_, i) => i + 1);
 
-  const versesWithNotes = notes.map(n => n.verse).filter(Boolean);
+  const versesWithNotes = [];
+  notes.forEach(note => {
+    if (note.verse) {
+      const parsed = parseVerseRange(note.verse);
+      parsed.forEach(v => {
+        if (!versesWithNotes.includes(v)) {
+          versesWithNotes.push(v);
+        }
+      });
+    }
+  });
 
   // Ascension Press Bible URL generator
   const ascensionUrl = `https://app.ascensionpress.com/bible/books/${activeBook.ascensionCode}/${activeChapter}`;
@@ -1078,7 +1177,7 @@ export default function Reader() {
                           // Regex to split by HEADING, POETRY, and POETRY_INDENT blocks
                           const tokenRegex = /(\[HEADING\].*?\[\/HEADING\]|\[POETRY\].*?\[\/POETRY\]|\[POETRY_INDENT\].*?\[\/POETRY_INDENT\])/g;
                           const parts = text.split(tokenRegex);
-                          const isSelected = activeSelectedVerse === verseNum;
+                          const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
 
                           if (parts.length > 1) {
@@ -1119,7 +1218,7 @@ export default function Reader() {
                                     return (
                                       <span 
                                         key={idx}
-                                        onClick={() => handleVerseClick(verseNum)}
+                                        onClick={(e) => handleVerseClick(e, verseNum)}
                                         style={{ 
                                           marginRight: '8px',
                                           cursor: 'pointer',
@@ -1156,7 +1255,7 @@ export default function Reader() {
                           return (
                             <span 
                               key={verseNum} 
-                              onClick={() => handleVerseClick(verseNum)}
+                              onClick={(e) => handleVerseClick(e, verseNum)}
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
@@ -1187,12 +1286,12 @@ export default function Reader() {
                         /* Render Static CDN Douay-Rheims Verses */
                         Object.entries(verses).map(([verseNum, text]) => {
                           const cleanText = text.replace(/^\*/, '');
-                          const isSelected = activeSelectedVerse === verseNum;
+                          const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
                           return (
                             <span 
                               key={verseNum} 
-                              onClick={() => handleVerseClick(verseNum)}
+                              onClick={(e) => handleVerseClick(e, verseNum)}
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
@@ -1451,9 +1550,10 @@ export default function Reader() {
                   placeholder="e.g. 5, or leave blank"
                   value={newNoteVerse}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    const val = e.target.value.replace(/[^0-9,\-\s]/g, '');
                     setNewNoteVerse(val);
-                    setActiveSelectedVerse(val || null);
+                    const parsed = parseVerseRange(val);
+                    setActiveSelectedVerses(parsed);
                   }}
                   style={{ width: '100px', padding: '6px 10px', fontSize: '12px' }}
                 />
