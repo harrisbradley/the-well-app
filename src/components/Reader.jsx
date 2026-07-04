@@ -290,6 +290,7 @@ export default function Reader() {
 
   // Selected Verse Click Handlers
   const handleVerseClick = (e, verseNum) => {
+    e.stopPropagation(); // Prevent bubbling up to the container's deselect handler
     let newSelection = [];
     
     if (e.shiftKey && activeSelectedVerses.length > 0) {
@@ -312,8 +313,12 @@ export default function Reader() {
         newSelection = [...activeSelectedVerses, verseNum];
       }
     } else {
-      // Standard single click select
-      newSelection = [verseNum];
+      // Standard single click select: toggle off if already selected singly
+      if (activeSelectedVerses.length === 1 && activeSelectedVerses[0] === verseNum) {
+        newSelection = [];
+      } else {
+        newSelection = [verseNum];
+      }
     }
     
     setActiveSelectedVerses(newSelection);
@@ -1164,13 +1169,18 @@ export default function Reader() {
                   )}
 
                   {!loading && !error && (
-                    <div style={{
-                      fontFamily: 'var(--font-serif)',
-                      fontSize: `${fontSize}px`,
-                      lineHeight: '1.85',
-                      color: '#ECE8E1',
-                      textAlign: 'justify',
-                    }}>
+                    <div 
+                      onClick={clearSelectedVerse}
+                      style={{
+                        fontFamily: 'var(--font-serif)',
+                        fontSize: `${fontSize}px`,
+                        lineHeight: '1.85',
+                        color: '#ECE8E1',
+                        textAlign: 'justify',
+                        cursor: 'default',
+                        padding: '16px 0',
+                      }}
+                    >
                       {activeTranslation === 'rsv-ce' && customVerses ? (
                         /* Render Transcribed RSV-CE Verses */
                         Object.entries(customVerses).map(([verseNum, text]) => {
