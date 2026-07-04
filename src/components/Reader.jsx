@@ -15,10 +15,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// Helper to identify and tag headings in the raw scripture text
-function tagHeadings(text) {
+// Helper to identify and tag headings and poetry/quotes in the raw scripture text
+function tagPoetryAndHeadings(text) {
   const lines = text.split('\n');
-  const processedLines = lines.map(line => {
+  const processedLines = lines.map((line, index) => {
     const trimmed = line.trim();
     if (!trimmed) return line;
 
@@ -27,6 +27,9 @@ function tagHeadings(text) {
 
     // Ignore footnote markers like "2.4b"
     if (/^\d+\.\d+/.test(trimmed)) return line;
+
+    // Check if the raw line starts with spaces or tabs (poetry indents)
+    const hasLeadingIndent = /^\s{2,}/.test(line) || /^\t/.test(line);
 
     // Check if it's title-case
     const words = trimmed.split(/\s+/);
@@ -39,11 +42,30 @@ function tagHeadings(text) {
     });
 
     const isShort = trimmed.length > 3 && trimmed.length < 80;
-    const hasNoEndingPunctuation = !/[.,;!?]$/.test(trimmed);
 
-    if (isShort && (isTitleCase || hasNoEndingPunctuation)) {
+    // 1. If it has a leading indent, tag it as indented poetry
+    if (hasLeadingIndent) {
+      return `[POETRY_INDENT]${trimmed}[/POETRY_INDENT]`;
+    }
+
+    // 2. If it is title case and short, it is a section heading
+    if (isShort && isTitleCase) {
       return `[HEADING]${trimmed}[/HEADING]`;
     }
+
+    // 3. If it is short, starts with a curly quote or ends with a curly quote, or is adjacent to indented poetry, tag it as poetry
+    const startsWithQuote = /^[“\"'\u2018]/.test(trimmed);
+    const endsWithQuote = /[”\"'\u2019]$/.test(trimmed);
+    
+    // Check neighbors for indentation to group the poem
+    const prevLine = lines[index - 1] || '';
+    const nextLine = lines[index + 1] || '';
+    const neighborsHaveIndent = /^\s{2,}/.test(prevLine) || /^\s{2,}/.test(nextLine) || /^\t/.test(prevLine) || /^\t/.test(nextLine);
+
+    if (isShort && (startsWithQuote || endsWithQuote || neighborsHaveIndent)) {
+      return `[POETRY]${trimmed}[/POETRY]`;
+    }
+
     return line;
   });
   return processedLines.join('\n');
@@ -58,8 +80,8 @@ function parseBibleText(rawText) {
     .replace(/\[[a-z]+\]/g, '')   // removes lowercase letters in brackets
     .replace(/\([A-Z]+\)/g, '');  // removes uppercase letters in parentheses
 
-  // Tag section headings in the text block before parsing out formatting newlines
-  cleanedText = tagHeadings(cleanedText);
+  // Tag section headings and poetry quotes in the text block before parsing out formatting newlines
+  cleanedText = tagPoetryAndHeadings(cleanedText);
 
   // Matches verse markers like: "1 In the beginning", "[1] In the beginning", or "1. In the beginning"
   const regex = /(?:^|\s+)\[?(\d+)\]?\.?\s+([^]+?)(?=\s+\[?\d+\]?\.?\s+|$)/g;
@@ -1038,15 +1060,16 @@ export default function Reader() {
                       {activeTranslation === 'rsv-ce' && customVerses ? (
                         /* Render Transcribed RSV-CE Verses */
                         Object.entries(customVerses).map(([verseNum, text]) => {
-                          const headingRegex = /\[HEADING\](.*?)\[\/HEADING\]/g;
-                          const parts = text.split(headingRegex);
+                          // Regex to split by HEADING, POETRY, and POETRY_INDENT blocks
+                          const tokenRegex = /(\[HEADING\].*?\[\/HEADING\]|\[POETRY\].*?\[\/POETRY\]|\[POETRY_INDENT\].*?\[\/POETRY_INDENT\])/g;
+                          const parts = text.split(tokenRegex);
 
                           if (parts.length > 1) {
                             return (
                               <span key={verseNum} style={{ display: 'inline' }}>
                                 {parts.map((part, idx) => {
-                                  if (idx % 2 === 1) {
-                                    // This is the heading text!
+                                  if (part.startsWith('[HEADING]')) {
+                                    const content = part.replace('[HEADING]', '').replace('[/HEADING]', '');
                                     return (
                                       <span key={idx} style={{ display: 'block', margin: '32px 0 16px 0', textAlign: 'left' }}>
                                         <h3 style={{
@@ -1056,12 +1079,25 @@ export default function Reader() {
                                           fontWeight: 600,
                                           margin: 0
                                         }}>
-                                          {part}
+                                          {content}
                                         </h3>
                                       </span>
                                     );
+                                  } else if (part.startsWith('[POETRY_INDENT]')) {
+                                    const content = part.replace('[POETRY_INDENT]', '').replace('[/POETRY_INDENT]', '');
+                                    return (
+                                      <span key={idx} style={{ display: 'block', paddingLeft: '48px', fontStyle: 'italic', margin: '6px 0', color: '#E2DCD2' }}>
+                                        {content}
+                                      </span>
+                                    );
+                                  } else if (part.startsWith('[POETRY]')) {
+                                    const content = part.replace('[POETRY]', '').replace('[/POETRY]', '');
+                                    return (
+                                      <span key={idx} style={{ display: 'block', paddingLeft: '24px', fontStyle: 'italic', margin: '6px 0', color: '#E2DCD2' }}>
+                                        {content}
+                                      </span>
+                                    );
                                   } else {
-                                    // This is standard verse text
                                     if (!part.trim()) return null;
                                     return (
                                       <span key={idx} style={{ marginRight: '8px' }}>
