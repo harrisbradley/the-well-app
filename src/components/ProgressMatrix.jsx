@@ -163,13 +163,19 @@ export default function ProgressMatrix() {
     return unsubscribe;
   }, [currentUser]);
 
-  // Group days by theological epoch period
-  const epochs = {};
+  // Group days by sequential chronological blocks (preserving interleaving checkpoints)
+  const blocks = [];
+  let currentBlock = null;
+
   readingPlan.forEach(day => {
-    if (!epochs[day.period]) {
-      epochs[day.period] = [];
+    if (!currentBlock || currentBlock.period !== day.period) {
+      currentBlock = {
+        period: day.period,
+        days: []
+      };
+      blocks.push(currentBlock);
     }
-    epochs[day.period].push(day);
+    currentBlock.days.push(day);
   });
 
   const totalCompleted = completedDays.length;
@@ -342,17 +348,28 @@ export default function ProgressMatrix() {
             Loading progress schema...
           </div>
         ) : (
-          Object.entries(epochs).map(([periodName, days]) => {
-            const periodColor = PERIOD_COLORS[periodName] || 'var(--color-sacred-gold)';
+          blocks.map((block, bIdx) => {
+            const periodColor = PERIOD_COLORS[block.period] || 'var(--color-sacred-gold)';
+            const days = block.days;
+            const periodName = block.period;
             
-            // Calculate completed percentage for this epoch
+            // Calculate completed percentage for this epoch block
             const epochCompleted = days.filter(d => completedDays.includes(d.day)).length;
             const epochTotal = days.length;
             const epochPercent = ((epochCompleted / epochTotal) * 100).toFixed(0);
 
+            // Display label with checkpoint name if Messianic Fulfillment
+            let displayTitle = periodName;
+            if (periodName === "Messianic Fulfillment") {
+              if (days[0].day === 99) displayTitle = "Messianic Fulfillment (John Checkpoint)";
+              else if (days[0].day === 154) displayTitle = "Messianic Fulfillment (Mark Checkpoint)";
+              else if (days[0].day === 258) displayTitle = "Messianic Fulfillment (Matthew Checkpoint)";
+              else if (days[0].day === 313) displayTitle = "Messianic Fulfillment (Luke Checkpoint)";
+            }
+
             return (
               <section 
-                key={periodName}
+                key={bIdx}
                 style={{
                   borderLeft: `3px solid ${periodColor}`,
                   paddingLeft: '24px',
@@ -372,7 +389,7 @@ export default function ProgressMatrix() {
                       alignItems: 'center',
                       gap: '8px',
                     }}>
-                      {periodName}
+                      {displayTitle}
                     </h2>
                     <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                       Days {days[0].day} – {days[days.length - 1].day}
