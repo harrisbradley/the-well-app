@@ -111,19 +111,41 @@ export default function ProgressMatrix() {
   const [newNoteText, setNewNoteText] = useState('');
   const [quickNoteStatus, setQuickNoteStatus] = useState(null); // 'saving' | 'saved'
 
-  // Listen to completed days progress document
+  // Listen to completed days progress document (with auto-initialization write to bypass old security rules)
   useEffect(() => {
     if (!currentUser) return;
+    
     const progressDocRef = doc(db, 'userProgress', currentUser.uid);
-    const unsubscribe = onSnapshot(progressDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCompletedDays(docSnap.data().completedDays || []);
-      } else {
-        setCompletedDays([]);
+    let unsubscribe = null;
+    let isMounted = true;
+
+    // Write empty progress shell if missing so the document exists and rules are satisfied
+    setDoc(progressDocRef, { userId: currentUser.uid }, { merge: true })
+      .then(() => {
+        if (!isMounted) return;
+        unsubscribe = onSnapshot(progressDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setCompletedDays(docSnap.data().completedDays || []);
+          } else {
+            setCompletedDays([]);
+          }
+          setLoadingProgress(false);
+        }, (err) => {
+          console.error("Firestore progress stream error:", err);
+          setLoadingProgress(false);
+        });
+      })
+      .catch((err) => {
+        console.error("Error initializing progress document:", err);
+        if (isMounted) setLoadingProgress(false);
+      });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
       }
-      setLoadingProgress(false);
-    });
-    return unsubscribe;
+    };
   }, [currentUser]);
 
   // Listen to all user reflections notes
