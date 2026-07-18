@@ -10,9 +10,9 @@ export function resolveBook(bookIdent) {
   if (!bookIdent) return null;
   const clean = bookIdent.toLowerCase().trim();
   return BIBLE_BOOKS.find(b => 
-    b.id.toLowerCase() === clean || 
-    b.usfmCode.toLowerCase() === clean || 
-    b.name.toLowerCase() === clean
+    (b.id && b.id.toLowerCase() === clean) || 
+    (b.usfmCode && b.usfmCode.toLowerCase() === clean) || 
+    (b.name && b.name.toLowerCase() === clean)
   ) || null;
 }
 

@@ -48,10 +48,10 @@ export const BIBLE_BOOKS = [
   { id: 'micheas', name: 'Micheas (Micah)', filename: 'Micheas.json', usfmCode: 'MIC', ascensionCode: 'Mic', chapters: 7, category: 'Prophets' },
   { id: 'nahum', name: 'Nahum', filename: 'Nahum.json', usfmCode: 'NAM', ascensionCode: 'Nah', chapters: 3, category: 'Prophets' },
   { id: 'habacuc', name: 'Habacuc (Habakkuk)', filename: 'Habacuc.json', usfmCode: 'HAB', ascensionCode: 'Hab', chapters: 3, category: 'Prophets' },
-  { id: 'sophonias', name: 'Sophonias (Zephaniah)', filename: 'ZEP', ascensionCode: 'Zep', chapters: 3, category: 'Prophets' },
-  { id: 'aggeus', name: 'Aggeus (Haggai)', filename: 'HAG', ascensionCode: 'Hag', chapters: 2, category: 'Prophets' },
-  { id: 'zacharias', name: 'Zacharias (Zechariah)', filename: 'ZEC', ascensionCode: 'Zec', chapters: 14, category: 'Prophets' },
-  { id: 'malachias', name: 'Malachias (Malachi)', filename: 'MAL', ascensionCode: 'Mal', chapters: 4, category: 'Prophets' },
+  { id: 'sophonias', name: 'Sophonias (Zephaniah)', filename: 'Sophonias.json', usfmCode: 'ZEP', ascensionCode: 'Zep', chapters: 3, category: 'Prophets' },
+  { id: 'aggeus', name: 'Aggeus (Haggai)', filename: 'Aggeus.json', usfmCode: 'HAG', ascensionCode: 'Hag', chapters: 2, category: 'Prophets' },
+  { id: 'zacharias', name: 'Zacharias (Zechariah)', filename: 'Zacharias.json', usfmCode: 'ZEC', ascensionCode: 'Zec', chapters: 14, category: 'Prophets' },
+  { id: 'malachias', name: 'Malachias (Malachi)', filename: 'Malachias.json', usfmCode: 'MAL', ascensionCode: 'Mal', chapters: 4, category: 'Prophets' },
 
   // GOSPELS & ACTS
   { id: 'matthew', name: 'Matthew', filename: 'Matthew.json', usfmCode: 'MAT', ascensionCode: 'Mat', chapters: 28, category: 'Gospels & Acts' },
