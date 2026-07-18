@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './components/Dashboard';
 import Reader from './components/Reader';
+import ProgressMatrix from './components/ProgressMatrix';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Widget from './components/Widget';
@@ -28,6 +29,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Reader />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/matrix" 
+            element={
+              <PrivateRoute>
+                <ProgressMatrix />
               </PrivateRoute>
             } 
           />

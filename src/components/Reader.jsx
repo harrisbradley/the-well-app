@@ -18,7 +18,7 @@ import { getDaysForVerse, getReadingsForDay } from '../data/planHelper';
 
 const PERIOD_COLORS = {
   "Early World": "#00B4D8",
-  "Patriarchs": "#9E2A2B",
+  "Patriarchs": "#7A203B",
   "Egypt & Exodus": "#D90429",
   "Desert Wanderings": "#D4B26F",
   "Conquest and Judges": "#38B000",
