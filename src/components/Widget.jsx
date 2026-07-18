@@ -178,58 +178,7 @@ export default function Widget() {
     );
   }
 
-  if (!currentUser) {
-    return (
-      <div style={{
-        boxSizing: 'border-box',
-        width: '300px',
-        height: '250px',
-        background: 'rgba(10, 14, 18, 0.95)',
-        backdropFilter: 'blur(16px)',
-        color: 'var(--text-ivory)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '20px',
-        border: '1px solid rgba(229, 193, 88, 0.15)',
-        borderRadius: '12px',
-        fontFamily: 'var(--font-sans)',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        textAlign: 'center',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🛡️</span>
-          <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--color-sacred-gold)', fontSize: '16px', margin: 0 }}>
-            The Well Hub
-          </h2>
-        </div>
-        <div>
-          <p style={{ fontSize: '12px', color: 'var(--text-slate)', margin: '0 0 4px 0' }}>
-            Daily reading plan is locked.
-          </p>
-          <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0 }}>
-            Sign in to track reading progress.
-          </p>
-        </div>
-        <button 
-          onClick={() => window.open(window.location.origin + '/login', '_blank')}
-          style={{
-            background: 'var(--color-sacred-gold)',
-            color: 'var(--bg-midnight)',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '8px 20px',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(229, 193, 88, 0.3)',
-          }}
-        >
-          Sign In
-        </button>
-      </div>
-    );
-  }
+
 
   return (
     <div style={{
@@ -326,69 +275,101 @@ export default function Widget() {
       </div>
 
       {/* Footer controls & progress */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* Completion Checkbox */}
-          <button
-            onClick={handleToggleCompleted}
+      {!currentUser ? (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'rgba(229, 193, 88, 0.04)',
+          border: '1px dashed rgba(229, 193, 88, 0.25)',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          boxSizing: 'border-box',
+          width: '100%',
+        }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-slate)' }}>🔒 Progress is locked</span>
+          <button 
+            onClick={() => window.open(window.location.origin + '/login', '_blank')}
             style={{
-              background: isCompleted ? 'var(--color-sacred-gold)' : 'transparent',
-              color: isCompleted ? 'var(--bg-midnight)' : 'var(--color-sacred-gold)',
-              border: '1px solid var(--color-sacred-gold)',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '11px',
+              background: 'var(--color-sacred-gold)',
+              color: 'var(--bg-midnight)',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '4px 10px',
+              fontSize: '10px',
               fontWeight: 700,
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 6px rgba(229, 193, 88, 0.2)',
             }}
           >
-            {isCompleted ? '✓ Completed' : '⚪ Mark Done'}
+            Sign In
           </button>
-
-          {/* Open Reader link */}
-          <a
-            href={window.location.origin + '/reader?day=' + planEntry.day}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: 'var(--color-sacred-gold)',
-              fontSize: '11px',
-              textDecoration: 'none',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}
-          >
-            Open Reader ↗
-          </a>
         </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Completion Checkbox */}
+            <button
+              onClick={handleToggleCompleted}
+              style={{
+                background: isCompleted ? 'var(--color-sacred-gold)' : 'transparent',
+                color: isCompleted ? 'var(--bg-midnight)' : 'var(--color-sacred-gold)',
+                border: '1px solid var(--color-sacred-gold)',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {isCompleted ? '✓ Completed' : '⚪ Mark Done'}
+            </button>
 
-        {/* Mini progress bar */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-dim)', marginBottom: '3px' }}>
-            <span>Plan Progress</span>
-            <span>{completedDays.length} / 365 Days ({progressPercent}%)</span>
+            {/* Open Reader link */}
+            <a
+              href={window.location.origin + '/reader?day=' + planEntry.day}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: 'var(--color-sacred-gold)',
+                fontSize: '11px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px'
+              }}
+            >
+              Open Reader ↗
+            </a>
           </div>
-          <div style={{
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: '4px',
-            height: '4px',
-            overflow: 'hidden'
-          }}>
+
+          {/* Mini progress bar */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-dim)', marginBottom: '3px' }}>
+              <span>Plan Progress</span>
+              <span>{completedDays.length} / 365 Days ({progressPercent}%)</span>
+            </div>
             <div style={{
-              width: `${progressPercent}%`,
-              height: '100%',
-              background: 'linear-gradient(90deg, var(--color-sacred-gold) 0%, #F59E0B 100%)',
-              transition: 'width 0.4s ease'
-            }} />
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: '4px',
+              height: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${progressPercent}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, var(--color-sacred-gold) 0%, #F59E0B 100%)',
+                transition: 'width 0.4s ease'
+              }} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
