@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -21,20 +21,26 @@ const PERIOD_COLORS = {
 };
 
 // Canvas Confetti
-function triggerWidgetConfetti() {
+function triggerWidgetConfetti(container) {
+  if (!container) return;
+
   const canvas = document.createElement('canvas');
-  canvas.style.position = 'fixed';
+  canvas.style.position = 'absolute';
   canvas.style.top = '0';
   canvas.style.left = '0';
   canvas.style.width = '100%';
   canvas.style.height = '100%';
   canvas.style.pointerEvents = 'none';
   canvas.style.zIndex = '9999';
-  document.body.appendChild(canvas);
+
+  // Ensure container has relative positioning for the absolute canvas overlay
+  container.style.position = 'relative';
+  container.appendChild(canvas);
 
   const ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
 
   const particles = [];
   const colors = ['#E5C158', '#00B4D8', '#9E2A2B', '#D90429', '#38B000', '#7209B7'];
@@ -43,9 +49,9 @@ function triggerWidgetConfetti() {
     particles.push({
       x: canvas.width / 2,
       y: canvas.height * 0.7,
-      vx: (Math.random() - 0.5) * 8,
-      vy: (Math.random() - 0.7) * 12,
-      size: Math.random() * 6 + 3,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.8) * 10,
+      size: Math.random() * 5 + 3,
       color: colors[Math.floor(Math.random() * colors.length)],
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 6,
@@ -60,9 +66,9 @@ function triggerWidgetConfetti() {
     particles.forEach(p => {
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.4;
+      p.vy += 0.35; // gravity
       p.rotation += p.rotationSpeed;
-      p.opacity -= 0.02;
+      p.opacity -= 0.025;
 
       if (p.opacity > 0) {
         active = true;
@@ -79,8 +85,8 @@ function triggerWidgetConfetti() {
     if (active) {
       requestAnimationFrame(animate);
     } else {
-      if (document.body.contains(canvas)) {
-        document.body.removeChild(canvas);
+      if (container.contains(canvas)) {
+        container.removeChild(canvas);
       }
     }
   }
@@ -90,6 +96,7 @@ function triggerWidgetConfetti() {
 
 export default function Widget() {
   const { currentUser, loading } = useAuth();
+  const widgetRef = useRef(null);
   const [completedDays, setCompletedDays] = useState([]);
   const [loadingProgress, setLoadingProgress] = useState(true);
 
@@ -141,7 +148,7 @@ export default function Widget() {
       updated = completedDays.filter(d => d !== dayNum);
     } else {
       updated = [...completedDays, dayNum];
-      triggerWidgetConfetti();
+      triggerWidgetConfetti(widgetRef.current);
     }
 
     try {
@@ -181,7 +188,9 @@ export default function Widget() {
 
 
   return (
-    <div style={{
+    <div 
+      ref={widgetRef}
+      style={{
       boxSizing: 'border-box',
       width: '100%',
       height: '100%',
