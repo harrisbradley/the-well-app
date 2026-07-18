@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { BIBLE_BOOKS, CATEGORIES } from '../data/books';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -18,7 +18,7 @@ import { getDaysForVerse, getReadingsForDay } from '../data/planHelper';
 
 const PERIOD_COLORS = {
   "Early World": "#00B4D8",
-  "Patriarchs": "#9E2A2B",
+  "Patriarchs": "#7A203B",
   "Egypt & Exodus": "#D90429",
   "Desert Wanderings": "#D4B26F",
   "Conquest and Judges": "#38B000",
@@ -202,6 +202,12 @@ export default function Reader() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
+  // Search Parameters & Daily Plan Mode States
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dayParam = searchParams.get('day');
+  const [selectedPodcastDay, setSelectedPodcastDay] = useState(null);
+  const [filterMode, setFilterMode] = useState('chapter'); // 'chapter' or 'day'
+
   // Selected Book and Chapter
   const [activeBook, setActiveBook] = useState(BIBLE_BOOKS[0]); // Default to Genesis
   const [activeChapter, setActiveChapter] = useState('1');
@@ -251,6 +257,13 @@ export default function Reader() {
 
   // Compute active chapter's corresponding podcast days
   const matchingDays = getDaysForVerse(`${activeBook.usfmCode}.${activeChapter}`);
+
+  const isCurrentActiveDayReading = selectedPodcastDay && 
+    getReadingsForDay(selectedPodcastDay)?.readings.some(r => 
+      r.bookId === activeBook.usfmCode && 
+      parseInt(activeChapter, 10) >= r.startChapter && 
+      parseInt(activeChapter, 10) <= r.endChapter
+    );
 
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
@@ -350,17 +363,50 @@ export default function Reader() {
     setNewNoteVerse('');
   };
 
+  // Handle Search Params for Daily Plan Mode
+  useEffect(() => {
+    if (dayParam) {
+      const dayNum = parseInt(dayParam, 10);
+      if (dayNum >= 1 && dayNum <= 365) {
+        setSelectedPodcastDay(dayNum);
+        setFilterMode('day');
+        
+        // Find readings for this day
+        const planEntry = getReadingsForDay(dayNum);
+        if (planEntry && planEntry.readings.length > 0) {
+          // Select the first reading
+          const firstReading = planEntry.readings[0];
+          const resolved = BIBLE_BOOKS.find(b => b.usfmCode === firstReading.bookId);
+          if (resolved) {
+            setActiveBook(resolved);
+            setActiveChapter(String(firstReading.startChapter));
+          }
+        }
+      }
+    }
+  }, [dayParam]);
+
   // Firestore Real-Time Notes Listener
   useEffect(() => {
-    if (!currentUser || !activeBook) return;
+    if (!currentUser) return;
 
     const notesRef = collection(db, 'notes');
-    const q = query(
-      notesRef,
-      where('userId', '==', currentUser.uid),
-      where('bookId', '==', activeBook.id),
-      where('chapter', '==', activeChapter)
-    );
+    let q;
+    if (filterMode === 'day' && selectedPodcastDay) {
+      q = query(
+        notesRef,
+        where('userId', '==', currentUser.uid),
+        where('podcastDay', '==', parseInt(selectedPodcastDay, 10))
+      );
+    } else {
+      if (!activeBook) return;
+      q = query(
+        notesRef,
+        where('userId', '==', currentUser.uid),
+        where('bookId', '==', activeBook.id),
+        where('chapter', '==', activeChapter)
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedNotes = snapshot.docs.map(doc => ({
@@ -369,6 +415,9 @@ export default function Reader() {
       }));
 
       const sortedNotes = fetchedNotes.sort((a, b) => {
+        if (filterMode === 'day') {
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        }
         const verseA = a.verse ? parseInt(a.verse, 10) : 0;
         const verseB = b.verse ? parseInt(b.verse, 10) : 0;
         
@@ -385,7 +434,7 @@ export default function Reader() {
     });
 
     return unsubscribe;
-  }, [currentUser, activeBook, activeChapter]);
+  }, [currentUser, activeBook, activeChapter, filterMode, selectedPodcastDay]);
 
   // Firestore Private Custom Scripture Listener (for RSV-CE user copy)
   useEffect(() => {
@@ -420,14 +469,33 @@ export default function Reader() {
 
     try {
       const notesRef = collection(db, 'notes');
-      await addDoc(notesRef, {
+      
+      const notePayload = {
         userId: currentUser.uid,
         bookId: activeBook.id,
         chapter: activeChapter,
         verse: newNoteVerse.trim() || null,
         text: newNoteText,
         createdAt: Date.now()
-      });
+      };
+
+      if (selectedPodcastDay) {
+        const dayReadings = getReadingsForDay(selectedPodcastDay);
+        const isChapterInDay = dayReadings?.readings.some(r => 
+          r.bookId === activeBook.usfmCode && 
+          parseInt(activeChapter, 10) >= r.startChapter && 
+          parseInt(activeChapter, 10) <= r.endChapter
+        );
+        if (isChapterInDay) {
+          notePayload.podcastDay = selectedPodcastDay;
+        } else if (matchingDays && matchingDays.length > 0) {
+          notePayload.podcastDay = matchingDays[0];
+        }
+      } else if (matchingDays && matchingDays.length > 0) {
+        notePayload.podcastDay = matchingDays[0];
+      }
+
+      await addDoc(notesRef, notePayload);
 
       setNewNoteText('');
       setNewNoteVerse('');
@@ -903,6 +971,86 @@ export default function Reader() {
           </header>
         )}
 
+        {/* Daily Plan Readings Bar */}
+        {selectedPodcastDay && (
+          <div style={{
+            background: 'rgba(229, 193, 88, 0.04)',
+            borderBottom: '1px solid rgba(229, 193, 88, 0.12)',
+            padding: '10px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                backgroundColor: PERIOD_COLORS[getReadingsForDay(selectedPodcastDay)?.period] || 'var(--color-sacred-gold)',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+              }} />
+              <span style={{ fontSize: '13px', color: 'var(--text-ivory)' }}>
+                Daily Plan: <strong style={{ color: 'var(--color-sacred-gold)' }}>Day {selectedPodcastDay}</strong> ({getReadingsForDay(selectedPodcastDay)?.period})
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Today's Readings:</span>
+              {getReadingsForDay(selectedPodcastDay)?.readings.map((r, idx) => {
+                const book = BIBLE_BOOKS.find(b => b.usfmCode === r.bookId);
+                if (!book) return null;
+                const label = `${book.name} ${r.startChapter}${r.endChapter !== r.startChapter ? `-${r.endChapter}` : ''}`;
+                
+                // Check if this reading is active
+                const isSelected = activeBook.usfmCode === r.bookId && 
+                  parseInt(activeChapter, 10) >= r.startChapter && 
+                  parseInt(activeChapter, 10) <= r.endChapter;
+                  
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setActiveBook(book);
+                      setActiveChapter(String(r.startChapter));
+                    }}
+                    style={{
+                      background: isSelected ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                      border: isSelected ? 'none' : '1px solid rgba(229, 193, 88, 0.2)',
+                      borderRadius: '16px',
+                      padding: '4px 12px',
+                      color: isSelected ? 'var(--bg-midnight)' : 'var(--color-sacred-gold)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => {
+                  setSelectedPodcastDay(null);
+                  setSearchParams({});
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#FCA5A5',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                  textDecoration: 'underline',
+                }}
+              >
+                Exit Plan
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Exit Focus Floating Button */}
         {distractionFree && (
           <button
@@ -1208,8 +1356,10 @@ export default function Reader() {
                     <h1 style={{
                       fontFamily: 'var(--font-serif)',
                       fontSize: '44px',
-                      color: 'var(--text-ivory)',
+                      color: isCurrentActiveDayReading ? 'var(--color-sacred-gold)' : 'var(--text-ivory)',
                       fontWeight: 600,
+                      textShadow: isCurrentActiveDayReading ? '0 0 15px rgba(229, 193, 88, 0.4)' : 'none',
+                      transition: 'text-shadow 0.3s ease, color 0.3s ease',
                     }}>
                       Chapter {activeChapter}
                     </h1>
@@ -1541,7 +1691,7 @@ export default function Reader() {
               Reflections
             </h3>
             <p style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
-              {activeBook.name} {activeChapter}
+              {filterMode === 'day' ? `Podcast Day ${selectedPodcastDay || '?'}` : `${activeBook.name} ${activeChapter}`}
             </p>
           </div>
           <button 
@@ -1556,6 +1706,102 @@ export default function Reader() {
             ✕
           </button>
         </div>
+
+        {/* Note Filters */}
+        <div style={{
+          padding: '12px 20px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          borderBottom: '1px solid rgba(229, 193, 88, 0.08)',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        }}>
+          <button
+            onClick={() => setFilterMode('chapter')}
+            style={{
+              flex: 1,
+              padding: '6px 12px',
+              borderRadius: '4px',
+              border: 'none',
+              background: filterMode === 'chapter' ? 'rgba(229, 193, 88, 0.12)' : 'transparent',
+              color: filterMode === 'chapter' ? 'var(--color-sacred-gold)' : 'var(--text-slate)',
+              fontSize: '11px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            📖 Active Chapter
+          </button>
+          
+          <button
+            onClick={() => {
+              setFilterMode('day');
+              if (!selectedPodcastDay) {
+                if (matchingDays && matchingDays.length > 0) {
+                  setSelectedPodcastDay(matchingDays[0]);
+                } else {
+                  setSelectedPodcastDay(1);
+                }
+              }
+            }}
+            style={{
+              flex: 1,
+              padding: '6px 12px',
+              borderRadius: '4px',
+              border: 'none',
+              background: filterMode === 'day' ? 'rgba(229, 193, 88, 0.12)' : 'transparent',
+              color: filterMode === 'day' ? 'var(--color-sacred-gold)' : 'var(--text-slate)',
+              fontSize: '11px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            🎙️ Podcast Day
+          </button>
+        </div>
+
+        {/* Day Selector dropdown */}
+        {filterMode === 'day' && (
+          <div style={{
+            padding: '10px 20px',
+            background: 'rgba(8, 10, 12, 0.2)',
+            borderBottom: '1px solid rgba(229, 193, 88, 0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+          }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-slate)' }}>Select Day:</span>
+            <select
+              value={selectedPodcastDay || 1}
+              onChange={(e) => setSelectedPodcastDay(parseInt(e.target.value, 10))}
+              style={{
+                background: 'var(--bg-deep-charcoal)',
+                border: '1px solid rgba(229, 193, 88, 0.2)',
+                borderRadius: '4px',
+                color: 'var(--color-sacred-gold)',
+                padding: '4px 8px',
+                fontSize: '12px',
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {Array.from({ length: 365 }, (_, i) => i + 1).map(d => (
+                <option key={d} value={d} style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>
+                  Day {d} ({getReadingsForDay(d)?.period})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Notes Timeline Stack */}
         <div style={{ 
@@ -1580,7 +1826,9 @@ export default function Reader() {
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: '12px', opacity: 0.5 }}>
                 <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>
-              <p style={{ fontSize: '13px' }}>No reflections logged for this chapter yet.</p>
+              <p style={{ fontSize: '13px' }}>
+                {filterMode === 'day' ? `No reflections logged for Day ${selectedPodcastDay || '?'}.` : 'No reflections logged for this chapter yet.'}
+              </p>
               <p style={{ fontSize: '11px', marginTop: '6px' }}>Type in the field below to catalog your study notes.</p>
             </div>
           ) : (
@@ -1600,16 +1848,34 @@ export default function Reader() {
                   }}
                 >
                   {/* Note Header Metadata */}
-                  <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      color: 'var(--color-sacred-gold)',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      {note.verse ? `Verse ${note.verse}` : 'Chapter Note'}
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--color-sacred-gold)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        {filterMode === 'day' ? (
+                          `${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || note.bookId} ${note.chapter}${note.verse ? `: ${note.verse}` : ''}`
+                        ) : (
+                          note.verse ? `Verse ${note.verse}` : 'Chapter Note'
+                        )}
+                      </span>
+                      {note.podcastDay && (
+                        <span style={{
+                          fontSize: '10px',
+                          background: 'rgba(229, 193, 88, 0.12)',
+                          color: 'var(--color-sacred-gold)',
+                          padding: '2px 6px',
+                          borderRadius: '8px',
+                          fontWeight: 500,
+                        }}>
+                          Day {note.podcastDay}
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Action Controls */}
                     <div style={{ display: 'flex', gap: '8px' }}>
