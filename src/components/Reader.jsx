@@ -14,6 +14,22 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getDaysForVerse, getReadingsForDay } from '../data/planHelper';
+
+const PERIOD_COLORS = {
+  "Early World": "#00B4D8",
+  "Patriarchs": "#9E2A2B",
+  "Egypt & Exodus": "#D90429",
+  "Desert Wanderings": "#D4B26F",
+  "Conquest and Judges": "#38B000",
+  "Royal Kingdom": "#7209B7",
+  "Divided Kingdom": "#495057",
+  "Exile": "#0077B6",
+  "Return": "#FFD166",
+  "Maccabean Revolt": "#F77F00",
+  "Messianic Fulfillment": "#E5C158",
+  "The Church": "#F7F5F0"
+};
 
 // Helper to identify and tag headings and poetry/quotes in the raw scripture text
 function tagPoetryAndHeadings(text) {
@@ -232,6 +248,9 @@ export default function Reader() {
   });
 
   const scrollContainerRef = useRef(null);
+
+  // Compute active chapter's corresponding podcast days
+  const matchingDays = getDaysForVerse(`${activeBook.usfmCode}.${activeChapter}`);
 
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
@@ -744,8 +763,26 @@ export default function Reader() {
                 fontFamily: 'var(--font-serif)',
                 fontSize: '20px',
                 color: 'var(--color-sacred-gold)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
               }}>
-                {activeBook.name} {activeChapter}
+                <span>{activeBook.name} {activeChapter}</span>
+                {matchingDays.length > 0 && (
+                  <span style={{
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-sans)',
+                    color: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                    border: `1px solid ${PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'rgba(229, 193, 88, 0.2)'}`,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    {matchingDays.map(d => `Day ${d}`).join(', ')}
+                  </span>
+                )}
               </h2>
             </div>
 
@@ -905,28 +942,48 @@ export default function Reader() {
             {chaptersList.map(chapNum => {
               const chapStr = String(chapNum);
               const isActive = activeChapter === chapStr;
+              const chapDays = getDaysForVerse(`${activeBook.usfmCode}.${chapStr}`);
+              const hasPlan = chapDays.length > 0;
+              const firstDay = hasPlan ? chapDays[0] : null;
+              const period = firstDay ? getReadingsForDay(firstDay)?.period : null;
+              const dotColor = period ? PERIOD_COLORS[period] : null;
+
               return (
-                <button
-                  key={chapNum}
-                  onClick={() => handleChapterChange(chapNum)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: isActive ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: isActive ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {chapNum}
-                </button>
+                <div key={chapNum} style={{ position: 'relative', display: 'inline-block' }}>
+                  <button
+                    onClick={() => handleChapterChange(chapNum)}
+                    title={hasPlan ? `Podcast Day: ${chapDays.map(d => `Day ${d}`).join(', ')} (${period})` : 'Not in reading plan'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: isActive ? 'var(--color-sacred-gold)' : 'transparent',
+                      color: isActive ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {chapNum}
+                  </button>
+                  {hasPlan && (
+                    <span style={{
+                      position: 'absolute',
+                      bottom: '2px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      backgroundColor: isActive ? 'var(--bg-midnight)' : dotColor,
+                    }} />
+                  )}
+                </div>
               );
             })}
           </div>
@@ -975,6 +1032,44 @@ export default function Reader() {
               <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', color: 'var(--color-sacred-gold)', marginBottom: '12px' }}>
                 Ascension Companion
               </h1>
+              {matchingDays.length > 0 && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '24px',
+                  padding: '6px 16px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(229, 193, 88, 0.1)',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                }}>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                    boxShadow: `0 0 8px ${PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)'}`,
+                  }}></span>
+                  <span style={{ color: 'var(--text-slate)' }}>
+                    Podcast {matchingDays.length === 1 ? 'Day' : 'Days'}: 
+                    <strong style={{ color: 'var(--color-sacred-gold)', marginLeft: '4px' }}>
+                      {matchingDays.map(d => `Day ${d}`).join(', ')}
+                    </strong>
+                  </span>
+                  <span style={{ color: 'var(--text-dim)', margin: '0 4px' }}>•</span>
+                  <span style={{
+                    color: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    fontSize: '11px',
+                    letterSpacing: '0.05em',
+                  }}>
+                    {getReadingsForDay(matchingDays[0])?.period}
+                  </span>
+                </div>
+              )}
               <p style={{ color: 'var(--text-slate)', fontSize: '15px', lineHeight: 1.6, marginBottom: '40px' }}>
                 Because the Ascension Press website has strict security rules blocking in-app embedding, you can open the active chapter directly in a pinned side-tab. Any notes you log on the right side will automatically bind to this scripture reference!
               </p>
@@ -1118,6 +1213,44 @@ export default function Reader() {
                     }}>
                       Chapter {activeChapter}
                     </h1>
+                    {matchingDays.length > 0 && (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginTop: '12px',
+                        padding: '4px 12px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(229, 193, 88, 0.1)',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                      }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                          boxShadow: `0 0 8px ${PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)'}`,
+                        }}></span>
+                        <span style={{ color: 'var(--text-slate)' }}>
+                          Podcast {matchingDays.length === 1 ? 'Day' : 'Days'}: 
+                          <strong style={{ color: 'var(--color-sacred-gold)', marginLeft: '4px' }}>
+                            {matchingDays.map(d => `Day ${d}`).join(', ')}
+                          </strong>
+                        </span>
+                        <span style={{ color: 'var(--text-dim)', margin: '0 4px' }}>•</span>
+                        <span style={{
+                          color: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          fontSize: '10px',
+                          letterSpacing: '0.05em',
+                        }}>
+                          {getReadingsForDay(matchingDays[0])?.period}
+                        </span>
+                      </div>
+                    )}
                     <hr style={{
                       width: '40px',
                       margin: '16px auto 0 auto',
