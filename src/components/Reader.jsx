@@ -1305,14 +1305,19 @@ export default function Reader() {
                     </p>
                   </div>
 
-                  <form onSubmit={handleSaveTranscription} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <textarea
                       className="input-field"
                       placeholder={`Paste RSV-CE ${activeBook.name} ${activeChapter} verses here...\n\nExample:\n1 In the beginning God created...\n2 And the earth was void...`}
                       value={transcriptionInput}
                       onChange={handleInputChange}
+                      onKeyDown={(e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveTranscription(e);
+                        }
+                      }}
                       style={{ minHeight: '220px', fontSize: '13px', fontFamily: 'var(--font-serif)', lineHeight: 1.6, resize: 'vertical' }}
-                      required
                     />
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1323,7 +1328,8 @@ export default function Reader() {
 
                         <button
                           className="btn btn-primary"
-                          type="submit"
+                          type="button"
+                          onClick={handleSaveTranscription}
                           disabled={saveStatus === 'saving'}
                           style={{ padding: '10px 24px', fontSize: '13px' }}
                         >
@@ -1337,7 +1343,7 @@ export default function Reader() {
                         </div>
                       )}
                     </div>
-                  </form>
+                  </div>
                 </div>
               ) : (
                 /* RENDER STANDARD BIBLE TEXT */
@@ -1949,7 +1955,7 @@ export default function Reader() {
           borderTop: '1px solid rgba(229, 193, 88, 0.1)',
           background: 'rgba(8, 10, 12, 0.6)'
         }}>
-          <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
@@ -1963,6 +1969,12 @@ export default function Reader() {
                     setNewNoteVerse(val);
                     const parsed = parseVerseRange(val);
                     setActiveSelectedVerses(parsed);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddNote(e);
+                    }
                   }}
                   style={{ width: '100px', padding: '6px 10px', fontSize: '12px' }}
                 />
@@ -1990,18 +2002,24 @@ export default function Reader() {
               placeholder={`Write note for ${activeBook.name} ${activeChapter}...`}
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddNote(e);
+                }
+              }}
               style={{ minHeight: '100px', fontSize: '13px', resize: 'none' }}
-              required
             />
 
             <button 
               className="btn btn-primary" 
-              type="submit" 
+              type="button"
+              onClick={handleAddNote}
               style={{ width: '100%', padding: '10px' }}
             >
               Add Reflection
             </button>
-          </form>
+          </div>
         </div>
       </aside>
 

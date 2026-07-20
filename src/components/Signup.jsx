@@ -12,7 +12,7 @@ export default function Signup() {
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!email || !password || !confirmPassword) {
       return setError('Please fill in all fields.');
@@ -130,7 +130,7 @@ export default function Signup() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'left', marginBottom: '24px' }}>
           <div style={{ marginBottom: '20px' }}>
             <label className="input-label" htmlFor="email">Email Address</label>
             <input 
@@ -139,6 +139,7 @@ export default function Signup() {
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
               placeholder="name@example.com"
               required 
             />
@@ -152,6 +153,7 @@ export default function Signup() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
               placeholder="•••••••• (Min 6 chars)"
               required 
             />
@@ -165,6 +167,7 @@ export default function Signup() {
               id="confirm-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
               placeholder="••••••••"
               required 
             />
@@ -172,13 +175,14 @@ export default function Signup() {
 
           <button 
             className="btn btn-primary" 
-            type="submit" 
+            type="button" 
+            onClick={handleSubmit}
             disabled={loading}
             style={{ width: '100%', padding: '14px' }}
           >
-            {loading ? 'Creating Account...' : 'Sign Up'}
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
-        </form>
+        </div>
 
         <div style={{
           display: 'flex',
