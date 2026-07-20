@@ -210,7 +210,7 @@ export default function ProgressMatrix() {
 
   // Add a quick note in the day detail modal
   const handleAddQuickNote = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!newNoteText.trim() || !selectedDayNum) return;
 
     setQuickNoteStatus('saving');
@@ -660,12 +660,18 @@ export default function ProgressMatrix() {
               </div>
 
               {/* Quick note addition form */}
-              <form onSubmit={handleAddQuickNote} style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
                   placeholder="Jot down a quick thought..."
                   value={newNoteText}
                   onChange={(e) => setNewNoteText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddQuickNote(e);
+                    }
+                  }}
                   style={{
                     flex: 1,
                     background: 'rgba(0,0,0,0.2)',
@@ -678,7 +684,8 @@ export default function ProgressMatrix() {
                   }}
                 />
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleAddQuickNote}
                   disabled={!newNoteText.trim() || quickNoteStatus === 'saving'}
                   className="btn btn-primary"
                   style={{
@@ -689,7 +696,7 @@ export default function ProgressMatrix() {
                 >
                   {quickNoteStatus === 'saving' ? 'Saving...' : 'Add'}
                 </button>
-              </form>
+              </div>
             </div>
           </div>
         </div>

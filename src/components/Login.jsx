@@ -11,7 +11,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!email || !password) {
       return setError('Please enter both email and password.');
     }
@@ -120,7 +120,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'left', marginBottom: '24px' }}>
           <div style={{ marginBottom: '20px' }}>
             <label className="input-label" htmlFor="email">Email Address</label>
             <input 
@@ -129,6 +129,7 @@ export default function Login() {
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
               placeholder="name@example.com"
               required 
             />
@@ -142,6 +143,7 @@ export default function Login() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
               placeholder="••••••••"
               required 
             />
@@ -149,13 +151,14 @@ export default function Login() {
 
           <button 
             className="btn btn-primary" 
-            type="submit" 
+            type="button" 
+            onClick={handleSubmit}
             disabled={loading}
             style={{ width: '100%', padding: '14px' }}
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
-        </form>
+        </div>
 
         <div style={{
           display: 'flex',
