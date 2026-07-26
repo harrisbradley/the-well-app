@@ -5,6 +5,7 @@ export default function YouTubePlayer({
   day,
   dayTitle,
   videoUrl,
+  isCustomVideo,
   onSaveVideoUrl,
   onDeleteVideoUrl,
   onClose
@@ -19,9 +20,9 @@ export default function YouTubePlayer({
   const watchUrl = currentVideoId ? getYouTubeWatchUrl(currentVideoId) : getYouTubeSearchUrl(day);
 
   useEffect(() => {
-    setInputUrl(videoUrl || '');
+    setInputUrl(isCustomVideo && videoUrl ? videoUrl : '');
     setErrorMsg('');
-  }, [videoUrl, day]);
+  }, [videoUrl, isCustomVideo, day]);
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -90,19 +91,33 @@ export default function YouTubePlayer({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
           <span style={{ fontSize: '16px' }}>📺</span>
           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 700,
-                color: 'var(--color-sacred-gold)',
-                fontFamily: 'var(--font-serif)',
-              }}
-            >
-              Day {day} Video
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: 'var(--color-sacred-gold)',
+                  fontFamily: 'var(--font-serif)',
+                }}
+              >
+                Day {day} Video
+              </span>
+              <span
+                style={{
+                  fontSize: '9px',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  background: isCustomVideo ? 'rgba(229, 193, 88, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isCustomVideo ? 'var(--color-sacred-gold)' : 'var(--text-dim)',
+                  fontWeight: 600,
+                }}
+              >
+                {isCustomVideo ? 'Custom' : 'Default'}
+              </span>
+            </div>
             {dayTitle && (
-              <span style={{ fontSize: '11px', color: 'var(--text-slate)', marginLeft: '6px' }}>
-                - {dayTitle}
+              <span style={{ fontSize: '11px', color: 'var(--text-slate)' }}>
+                {dayTitle}
               </span>
             )}
           </div>
@@ -207,12 +222,12 @@ export default function YouTubePlayer({
           {isEditing ? (
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text-ivory)', fontWeight: 600 }}>
-                Associate YouTube Video for Day {day}:
+                {isCustomVideo ? `Custom Video Link (Day ${day}):` : `Associate Custom YouTube Video for Day ${day}:`}
               </label>
               <input
                 type="text"
                 className="input-field"
-                placeholder="Paste YouTube Video URL or ID (e.g., https://youtu.be/...)"
+                placeholder={isCustomVideo ? "Paste new YouTube Video URL or ID" : "Paste YouTube Video URL or ID (currently using default)"}
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 style={{ fontSize: '12px', padding: '8px 10px' }}
@@ -234,11 +249,11 @@ export default function YouTubePlayer({
                   🔍 Search YouTube
                 </a>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  {videoUrl && (
+                  {isCustomVideo && (
                     <button
                       type="button"
                       onClick={handleDelete}
-                      title="Clear saved video for this day"
+                      title="Clear custom video link and reset to default"
                       style={{
                         background: 'rgba(239, 68, 68, 0.15)',
                         border: '1px solid rgba(239, 68, 68, 0.4)',
@@ -250,7 +265,7 @@ export default function YouTubePlayer({
                         cursor: 'pointer',
                       }}
                     >
-                      🗑️ Clear
+                      🗑️ Clear Custom
                     </button>
                   )}
                   <button

@@ -54,6 +54,16 @@ export function useDayVideos() {
   };
 
   /**
+   * Checks if a day has a custom user-saved video.
+   * @param {number|string} day 
+   * @returns {boolean}
+   */
+  const hasCustomVideo = (day) => {
+    const dayStr = String(day);
+    return Boolean(customVideos && customVideos[dayStr]);
+  };
+
+  /**
    * Saves or updates a custom YouTube video for a given day.
    * @param {number|string} day 
    * @param {string} inputUrlOrId 
@@ -100,6 +110,7 @@ export function useDayVideos() {
 
   return {
     getVideoForDay,
+    hasCustomVideo,
     saveVideoUrl,
     deleteVideoUrl,
     loading

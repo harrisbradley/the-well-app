@@ -104,7 +104,7 @@ export default function ProgressMatrix() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  const { getVideoForDay, saveVideoUrl, deleteVideoUrl } = useDayVideos();
+  const { getVideoForDay, hasCustomVideo, saveVideoUrl, deleteVideoUrl } = useDayVideos();
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   // Progress states
@@ -743,6 +743,7 @@ export default function ProgressMatrix() {
           day={selectedDayInfo.day}
           dayTitle={selectedDayInfo.title}
           videoUrl={getVideoForDay(selectedDayInfo.day)}
+          isCustomVideo={hasCustomVideo(selectedDayInfo.day)}
           onSaveVideoUrl={saveVideoUrl}
           onDeleteVideoUrl={deleteVideoUrl}
           onClose={() => setShowVideoPlayer(false)}
