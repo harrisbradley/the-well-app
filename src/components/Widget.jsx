@@ -338,23 +338,40 @@ export default function Widget() {
               {isCompleted ? '✓ Completed' : '⚪ Mark Done'}
             </button>
 
-            {/* Open Reader link */}
-            <a
-              href={window.location.origin + '/reader?day=' + planEntry.day}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: 'var(--color-sacred-gold)',
-                fontSize: '11px',
-                textDecoration: 'none',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}
-            >
-              Open Reader ↗
-            </a>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <a
+                href={window.location.origin + '/reader?day=' + planEntry.day + '&video=1'}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: 'var(--color-sacred-gold)',
+                  fontSize: '11px',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+              >
+                📺 Video ↗
+              </a>
+              <a
+                href={window.location.origin + '/reader?day=' + planEntry.day}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: 'var(--color-sacred-gold)',
+                  fontSize: '11px',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+              >
+                Open Reader ↗
+              </a>
+            </div>
           </div>
 
           {/* Mini progress bar */}
