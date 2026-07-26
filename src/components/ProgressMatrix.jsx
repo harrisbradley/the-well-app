@@ -239,6 +239,7 @@ export default function ProgressMatrix() {
         verse: null,
         text: newNoteText,
         podcastDay: selectedDayNum,
+        isDayNote: true,
         createdAt: Date.now()
       };
 
@@ -654,8 +655,8 @@ export default function ProgressMatrix() {
                       key={n.id}
                       style={{
                         padding: '8px 12px',
-                        background: 'rgba(0,0,0,0.2)',
-                        border: '1px solid rgba(229, 193, 88, 0.08)',
+                        background: n.isDayNote ? 'rgba(229, 193, 88, 0.08)' : 'rgba(0,0,0,0.2)',
+                        border: n.isDayNote ? '1px solid rgba(229, 193, 88, 0.3)' : '1px solid rgba(229, 193, 88, 0.08)',
                         borderRadius: '6px',
                         fontSize: '12px',
                         color: 'var(--text-slate)',
@@ -663,7 +664,7 @@ export default function ProgressMatrix() {
                       }}
                     >
                       <strong style={{ color: 'var(--color-sacred-gold)', fontSize: '10px', display: 'block', marginBottom: '2px' }}>
-                        {BIBLE_BOOKS.find(b => b.id === n.bookId)?.name || n.bookId} {n.chapter}{n.verse ? `:${n.verse}` : ''}
+                        {n.isDayNote ? `🎙️ Day ${selectedDayInfo.day} Episode Reflection` : `${BIBLE_BOOKS.find(b => b.id === n.bookId)?.name || n.bookId} ${n.chapter}${n.verse ? `:${n.verse}` : ''}`}
                       </strong>
                       {n.text}
                     </div>

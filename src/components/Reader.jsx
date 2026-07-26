@@ -235,6 +235,8 @@ export default function Reader() {
   const [activeSelectedVerses, setActiveSelectedVerses] = useState([]);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [activeNoteId, setActiveNoteId] = useState(null);
+  const [noteScope, setNoteScope] = useState('verse'); // 'verse' | 'chapter' | 'day'
 
   // Layout & Mode States
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -363,12 +365,52 @@ export default function Reader() {
     
     setActiveSelectedVerses(newSelection);
     setNewNoteVerse(formatVerseRange(newSelection));
+    if (newSelection.length > 0) {
+      setNoteScope('verse');
+    }
     setNotesPanelOpen(true);
+
+    // If there is an existing note for this verse, highlight and scroll to its card in drawer
+    const noteForVerse = notes.find(n => n.verse && parseVerseRange(n.verse).includes(String(verseNum)));
+    if (noteForVerse) {
+      setActiveNoteId(noteForVerse.id);
+      setTimeout(() => {
+        const cardEl = document.getElementById(`note-card-${noteForVerse.id}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    }
+  };
+
+  const handleNoteCardClick = (note) => {
+    setActiveNoteId(note.id);
+    if (note.verse) {
+      const parsedVerses = parseVerseRange(note.verse);
+      setActiveSelectedVerses(parsedVerses);
+      setNewNoteVerse(formatVerseRange(parsedVerses));
+      setNoteScope('verse');
+      if (parsedVerses.length > 0) {
+        const firstVerseEl = document.getElementById(`verse-${parsedVerses[0]}`);
+        if (firstVerseEl) {
+          firstVerseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    } else if (note.isDayNote) {
+      setActiveSelectedVerses([]);
+      setNewNoteVerse('');
+      setNoteScope('day');
+    } else {
+      setActiveSelectedVerses([]);
+      setNewNoteVerse('');
+      setNoteScope('chapter');
+    }
   };
 
   const clearSelectedVerse = () => {
     setActiveSelectedVerses([]);
     setNewNoteVerse('');
+    setNoteScope('chapter');
   };
 
   // Handle Search Params for Daily Plan Mode
@@ -482,31 +524,32 @@ export default function Reader() {
         userId: currentUser.uid,
         bookId: activeBook.id,
         chapter: activeChapter,
-        verse: newNoteVerse.trim() || null,
         text: newNoteText,
         createdAt: Date.now()
       };
 
-      if (selectedPodcastDay) {
-        const dayReadings = getReadingsForDay(selectedPodcastDay);
-        const isChapterInDay = dayReadings?.readings.some(r => 
-          r.bookId === activeBook.usfmCode && 
-          parseInt(activeChapter, 10) >= r.startChapter && 
-          parseInt(activeChapter, 10) <= r.endChapter
-        );
-        if (isChapterInDay) {
-          notePayload.podcastDay = selectedPodcastDay;
-        } else if (matchingDays && matchingDays.length > 0) {
-          notePayload.podcastDay = matchingDays[0];
-        }
-      } else if (matchingDays && matchingDays.length > 0) {
-        notePayload.podcastDay = matchingDays[0];
+      const targetDay = selectedPodcastDay || (matchingDays && matchingDays.length > 0 ? matchingDays[0] : null);
+
+      if (noteScope === 'day' && targetDay) {
+        notePayload.isDayNote = true;
+        notePayload.podcastDay = targetDay;
+        notePayload.verse = null;
+      } else if (noteScope === 'chapter') {
+        notePayload.isDayNote = false;
+        notePayload.verse = null;
+        if (targetDay) notePayload.podcastDay = targetDay;
+      } else {
+        notePayload.isDayNote = false;
+        notePayload.verse = newNoteVerse.trim() || null;
+        if (targetDay) notePayload.podcastDay = targetDay;
       }
 
       await addDoc(notesRef, notePayload);
 
       setNewNoteText('');
       setNewNoteVerse('');
+      setActiveSelectedVerses([]);
+      setActiveNoteId(null);
     } catch (err) {
       console.error("Error adding note:", err);
     }
@@ -1560,15 +1603,21 @@ export default function Reader() {
                                     return (
                                       <span 
                                         key={idx}
+                                        id={`verse-${verseNum}`}
                                         onClick={(e) => handleVerseClick(e, verseNum)}
                                         style={{ 
                                           marginRight: '8px',
                                           cursor: 'pointer',
-                                          background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
-                                          borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                          background: isSelected 
+                                            ? 'rgba(229, 193, 88, 0.28)' 
+                                            : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
+                                          borderBottom: isSelected 
+                                            ? '2px solid var(--color-sacred-gold)' 
+                                            : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
                                           padding: '2px 4px',
                                           borderRadius: '4px',
-                                          transition: 'background var(--transition-fast)',
+                                          transition: 'all 0.2s ease',
+                                          boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
                                         }}
                                         className="readable-verse"
                                       >
@@ -1597,15 +1646,21 @@ export default function Reader() {
                           return (
                             <span 
                               key={verseNum} 
+                              id={`verse-${verseNum}`}
                               onClick={(e) => handleVerseClick(e, verseNum)}
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
-                                background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
-                                borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                background: isSelected 
+                                  ? 'rgba(229, 193, 88, 0.28)' 
+                                  : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
+                                borderBottom: isSelected 
+                                  ? '2px solid var(--color-sacred-gold)' 
+                                  : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
                                 padding: '2px 4px',
                                 borderRadius: '4px',
-                                transition: 'background var(--transition-fast)',
+                                transition: 'all 0.2s ease',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
                               }}
                               className="readable-verse"
                             >
@@ -1633,15 +1688,21 @@ export default function Reader() {
                           return (
                             <span 
                               key={verseNum} 
+                              id={`verse-${verseNum}`}
                               onClick={(e) => handleVerseClick(e, verseNum)}
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
-                                background: isSelected ? 'rgba(229, 193, 88, 0.18)' : 'transparent',
-                                borderBottom: isSelected ? '1px solid var(--color-sacred-gold)' : 'none',
+                                background: isSelected 
+                                  ? 'rgba(229, 193, 88, 0.28)' 
+                                  : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
+                                borderBottom: isSelected 
+                                  ? '2px solid var(--color-sacred-gold)' 
+                                  : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
                                 padding: '2px 4px',
                                 borderRadius: '4px',
-                                transition: 'background var(--transition-fast)',
+                                transition: 'all 0.2s ease',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
                               }}
                               className="readable-verse"
                             >
@@ -1883,22 +1944,29 @@ export default function Reader() {
           ) : (
             notes.map(note => {
               const isEditing = editingNoteId === note.id;
+              const isCardActive = activeNoteId === note.id;
               return (
                 <div 
                   key={note.id} 
+                  id={`note-card-${note.id}`}
+                  onClick={() => handleNoteCardClick(note)}
                   className="glass-panel" 
                   style={{
                     padding: '16px',
-                    background: 'rgba(8, 10, 12, 0.4)',
-                    border: '1px solid rgba(229, 193, 88, 0.12)',
+                    background: isCardActive ? 'rgba(229, 193, 88, 0.08)' : 'rgba(8, 10, 12, 0.4)',
+                    border: isCardActive ? '1px solid var(--color-sacred-gold)' : '1px solid rgba(229, 193, 88, 0.12)',
+                    boxShadow: isCardActive ? '0 0 14px rgba(229, 193, 88, 0.2)' : 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {/* Note Header Metadata */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{
                         fontSize: '11px',
                         color: 'var(--color-sacred-gold)',
@@ -1906,13 +1974,15 @@ export default function Reader() {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        {filterMode === 'day' ? (
-                          `${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || note.bookId} ${note.chapter}${note.verse ? `: ${note.verse}` : ''}`
+                        {note.isDayNote ? (
+                          `🎙️ Day ${note.podcastDay} Episode Reflection`
+                        ) : note.verse ? (
+                          `📖 Verse ${note.verse}`
                         ) : (
-                          note.verse ? `Verse ${note.verse}` : 'Chapter Note'
+                          `📑 ${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || activeBook.name} ${note.chapter}`
                         )}
                       </span>
-                      {note.podcastDay && (
+                      {note.podcastDay && !note.isDayNote && (
                         <span style={{
                           fontSize: '10px',
                           background: 'rgba(229, 193, 88, 0.12)',
@@ -1931,7 +2001,8 @@ export default function Reader() {
                       {!isEditing && (
                         <>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingNoteId(note.id);
                               setEditingText(note.text);
                             }}
@@ -1940,7 +2011,10 @@ export default function Reader() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteNote(note.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNote(note.id);
+                            }}
                             style={{ background: 'none', border: 'none', color: '#FCA5A5', fontSize: '11px', cursor: 'pointer' }}
                           >
                             Delete
@@ -1952,7 +2026,7 @@ export default function Reader() {
 
                   {/* Note Body Text */}
                   {isEditing ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
                       <textarea
                         className="input-field"
                         value={editingText}
@@ -1999,50 +2073,129 @@ export default function Reader() {
           background: 'rgba(8, 10, 12, 0.6)'
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. 5, or leave blank"
-                  value={newNoteVerse}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9,\-\s]/g, '');
-                    setNewNoteVerse(val);
-                    const parsed = parseVerseRange(val);
-                    setActiveSelectedVerses(parsed);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddNote(e);
-                    }
-                  }}
-                  style={{ width: '100px', padding: '6px 10px', fontSize: '12px' }}
-                />
-              </div>
-              {newNoteVerse && (
+            
+            {/* Scope Selection Selector Pills */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attach To:</span>
+              
+              <button
+                type="button"
+                onClick={() => setNoteScope('verse')}
+                style={{
+                  background: noteScope === 'verse' ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                  color: noteScope === 'verse' ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  border: '1px solid rgba(229, 193, 88, 0.2)',
+                  borderRadius: '12px',
+                  padding: '3px 10px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📖 Verse {newNoteVerse ? `(${newNoteVerse})` : ''}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNoteScope('chapter');
+                  setActiveSelectedVerses([]);
+                  setNewNoteVerse('');
+                }}
+                style={{
+                  background: noteScope === 'chapter' ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                  color: noteScope === 'chapter' ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  border: '1px solid rgba(229, 193, 88, 0.2)',
+                  borderRadius: '12px',
+                  padding: '3px 10px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📑 Chapter ({activeBook.name} {activeChapter})
+              </button>
+
+              {(selectedPodcastDay || (matchingDays && matchingDays.length > 0)) && (
                 <button
                   type="button"
-                  onClick={clearSelectedVerse}
+                  onClick={() => {
+                    setNoteScope('day');
+                    setActiveSelectedVerses([]);
+                    setNewNoteVerse('');
+                  }}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-sacred-gold)',
+                    background: noteScope === 'day' ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                    color: noteScope === 'day' ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    borderRadius: '12px',
+                    padding: '3px 10px',
                     fontSize: '11px',
+                    fontWeight: 600,
                     cursor: 'pointer',
-                    textDecoration: 'underline',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  Clear Selection
+                  🎙️ Day {selectedPodcastDay || matchingDays[0]} Episode
                 </button>
               )}
             </div>
 
+            {/* Verse Range Input (Shown if scope is Verse) */}
+            {noteScope === 'verse' && (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <label className="input-label" style={{ margin: 0, fontSize: '11px' }}>Verse Scope:</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. 5, or select in text"
+                    value={newNoteVerse}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9,\-\s]/g, '');
+                      setNewNoteVerse(val);
+                      const parsed = parseVerseRange(val);
+                      setActiveSelectedVerses(parsed);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddNote(e);
+                      }
+                    }}
+                    style={{ width: '120px', padding: '6px 10px', fontSize: '12px' }}
+                  />
+                </div>
+                {newNoteVerse && (
+                  <button
+                    type="button"
+                    onClick={clearSelectedVerse}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-sacred-gold)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
             <textarea
               className="input-field"
-              placeholder={`Write note for ${activeBook.name} ${activeChapter}...`}
+              placeholder={
+                noteScope === 'day' 
+                  ? `Write Episode reflection for Day ${selectedPodcastDay || matchingDays[0]}...` 
+                  : noteScope === 'chapter' 
+                    ? `Write Chapter note for ${activeBook.name} ${activeChapter}...` 
+                    : `Write Verse reflection for ${activeBook.name} ${activeChapter}${newNoteVerse ? `:${newNoteVerse}` : ''}...`
+              }
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
               onKeyDown={(e) => {
