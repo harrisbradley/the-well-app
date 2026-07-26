@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeSearchUrl } from '../utils/youtubeHelper';
+import { extractYouTubeId, getYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../utils/youtubeHelper';
 
 export default function YouTubePlayer({
   day,
@@ -15,6 +15,7 @@ export default function YouTubePlayer({
 
   const currentVideoId = extractYouTubeId(videoUrl);
   const embedUrl = currentVideoId ? getYouTubeEmbedUrl(currentVideoId) : null;
+  const watchUrl = currentVideoId ? getYouTubeWatchUrl(currentVideoId) : getYouTubeSearchUrl(day);
 
   useEffect(() => {
     setInputUrl(videoUrl || '');
@@ -41,6 +42,11 @@ export default function YouTubePlayer({
     setErrorMsg('');
   };
 
+  const handlePopout = () => {
+    if (!watchUrl) return;
+    window.open(watchUrl, 'YouTubePopout', 'width=780,height=440,resizable=yes,scrollbars=yes');
+  };
+
   return (
     <div
       style={{
@@ -48,7 +54,7 @@ export default function YouTubePlayer({
         bottom: '24px',
         right: '24px',
         zIndex: 9990,
-        width: isMinimized ? '300px' : '380px',
+        width: isMinimized ? '300px' : '390px',
         background: 'rgba(16, 20, 24, 0.95)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
@@ -93,6 +99,29 @@ export default function YouTubePlayer({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {currentVideoId && (
+            <button
+              type="button"
+              title="Pop-out Floating Video Window"
+              onClick={handlePopout}
+              style={{
+                background: 'rgba(229, 193, 88, 0.15)',
+                border: '1px solid rgba(229, 193, 88, 0.3)',
+                borderRadius: '6px',
+                color: 'var(--color-sacred-gold)',
+                padding: '2px 8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 600,
+                gap: '2px',
+              }}
+            >
+              ↗️ Pop-out
+            </button>
+          )}
           <button
             type="button"
             title="Edit Video Link"
@@ -164,9 +193,9 @@ export default function YouTubePlayer({
 
       {/* Expanded View */}
       {!isMinimized && (
-        <div style={{ padding: isEditing ? '14px' : '0' }}>
+        <div>
           {isEditing ? (
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text-ivory)', fontWeight: 600 }}>
                 Associate YouTube Video for Day {day}:
               </label>
@@ -214,21 +243,68 @@ export default function YouTubePlayer({
               </div>
             </form>
           ) : embedUrl ? (
-            <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
-              <iframe
-                src={embedUrl}
-                title={`Bible in a Year Day ${day} YouTube Video`}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
+            <div>
+              <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
+                <iframe
+                  src={embedUrl}
+                  title={`Bible in a Year Day ${day} YouTube Video`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                  }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="origin"
+                  allowFullScreen
+                />
+              </div>
+              <div style={{
+                padding: '8px 12px',
+                background: 'rgba(0, 0, 0, 0.4)',
+                borderTop: '1px solid rgba(229, 193, 88, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+              }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+                  If video playback is disabled by owner:
+                </span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handlePopout}
+                    style={{
+                      background: 'rgba(229, 193, 88, 0.15)',
+                      border: '1px solid rgba(229, 193, 88, 0.3)',
+                      borderRadius: '4px',
+                      color: 'var(--color-sacred-gold)',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ↗️ Pop-out Window
+                  </button>
+                  <a
+                    href={watchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: 'var(--color-sacred-gold)',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Watch on YouTube ↗
+                  </a>
+                </div>
+              </div>
             </div>
           ) : (
             <div style={{ padding: '24px 16px', textAlign: 'center' }}>

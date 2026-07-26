@@ -45,14 +45,27 @@ export function getYouTubeEmbedUrl(input, options = {}) {
   const videoId = extractYouTubeId(input);
   if (!videoId) return null;
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const params = new URLSearchParams({
     rel: '0',
     modestbranding: '1',
     enablejsapi: '1',
+    origin: origin,
     ...options
   });
 
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
+
+/**
+ * Gets the direct YouTube watch URL for a given video ID or URL.
+ * @param {string} input 
+ * @returns {string|null}
+ */
+export function getYouTubeWatchUrl(input) {
+  const videoId = extractYouTubeId(input);
+  if (!videoId) return null;
+  return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
 /**
