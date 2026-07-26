@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { 
@@ -100,6 +100,7 @@ function triggerConfetti() {
 export default function ProgressMatrix() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Progress states
   const [completedDays, setCompletedDays] = useState([]);
@@ -110,6 +111,17 @@ export default function ProgressMatrix() {
   const [selectedDayNum, setSelectedDayNum] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
   const [quickNoteStatus, setQuickNoteStatus] = useState(null); // 'saving' | 'saved'
+
+  // Open day detail modal if day parameter exists in URL query string
+  useEffect(() => {
+    const dayParam = searchParams.get('day');
+    if (dayParam) {
+      const dayNum = parseInt(dayParam, 10);
+      if (dayNum >= 1 && dayNum <= 365) {
+        setSelectedDayNum(dayNum);
+      }
+    }
+  }, [searchParams]);
 
   // Listen to completed days progress document (with auto-initialization write to bypass old security rules)
   useEffect(() => {

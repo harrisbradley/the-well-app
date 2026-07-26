@@ -320,6 +320,14 @@ export default function Reader() {
     }
   }, [activeChapter, bookCache, ascensionMode, activeBook, activeTranslation]);
 
+  // Always scroll reader container to top when book or chapter changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  }, [activeBook, activeChapter]);
+
   // Selected Verse Click Handlers
   const handleVerseClick = (e, verseNum) => {
     e.stopPropagation(); // Prevent bubbling up to the container's deselect handler
@@ -951,6 +959,25 @@ export default function Reader() {
                 📝 Reflections {notes.length > 0 ? `(${notes.length})` : ''}
               </button>
 
+              {/* Progress Matrix navigation button */}
+              <button
+                onClick={() => navigate(selectedPodcastDay ? `/matrix?day=${selectedPodcastDay}` : '/matrix')}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(229, 193, 88, 0.2)',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  color: 'var(--color-sacred-gold)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+                title="Go to Progress Matrix"
+              >
+                📊 Matrix
+              </button>
+
               <button
                 onClick={() => setDistractionFree(true)}
                 style={{
@@ -1030,6 +1057,22 @@ export default function Reader() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => navigate(`/matrix?day=${selectedPodcastDay}`)}
+                style={{
+                  background: 'rgba(229, 193, 88, 0.12)',
+                  border: '1px solid rgba(229, 193, 88, 0.3)',
+                  borderRadius: '16px',
+                  padding: '4px 12px',
+                  color: 'var(--color-sacred-gold)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                }}
+              >
+                ← Back to Matrix
+              </button>
               <button
                 onClick={() => {
                   setSelectedPodcastDay(null);
