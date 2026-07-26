@@ -371,7 +371,13 @@ export default function Reader() {
     setNotesPanelOpen(true);
 
     // If there is an existing note for this verse, highlight and scroll to its card in drawer
-    const noteForVerse = notes.find(n => n.verse && parseVerseRange(n.verse).includes(String(verseNum)));
+    const noteForVerse = notes.find(n => 
+      !n.isDayNote && 
+      n.bookId === activeBook.id && 
+      String(n.chapter) === String(activeChapter) && 
+      n.verse && 
+      parseVerseRange(n.verse).includes(String(verseNum))
+    );
     if (noteForVerse) {
       setActiveNoteId(noteForVerse.id);
       setTimeout(() => {
@@ -385,16 +391,30 @@ export default function Reader() {
 
   const handleNoteCardClick = (note) => {
     setActiveNoteId(note.id);
+
+    // If note belongs to a specific scripture reference in a different book/chapter, switch to it
+    if (!note.isDayNote && note.bookId) {
+      const targetBook = BIBLE_BOOKS.find(b => b.id === note.bookId);
+      if (targetBook && (targetBook.id !== activeBook.id || String(note.chapter) !== String(activeChapter))) {
+        setActiveBook(targetBook);
+        if (note.chapter) {
+          setActiveChapter(String(note.chapter));
+        }
+      }
+    }
+
     if (note.verse) {
       const parsedVerses = parseVerseRange(note.verse);
       setActiveSelectedVerses(parsedVerses);
       setNewNoteVerse(formatVerseRange(parsedVerses));
       setNoteScope('verse');
       if (parsedVerses.length > 0) {
-        const firstVerseEl = document.getElementById(`verse-${parsedVerses[0]}`);
-        if (firstVerseEl) {
-          firstVerseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        setTimeout(() => {
+          const firstVerseEl = document.getElementById(`verse-${parsedVerses[0]}`);
+          if (firstVerseEl) {
+            firstVerseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
       }
     } else if (note.isDayNote) {
       setActiveSelectedVerses([]);
@@ -663,7 +683,7 @@ export default function Reader() {
 
   const versesWithNotes = [];
   notes.forEach(note => {
-    if (note.verse) {
+    if (!note.isDayNote && note.verse && note.bookId === activeBook.id && String(note.chapter) === String(activeChapter)) {
       const parsed = parseVerseRange(note.verse);
       parsed.forEach(v => {
         if (!versesWithNotes.includes(v)) {
@@ -1977,7 +1997,7 @@ export default function Reader() {
                         {note.isDayNote ? (
                           `🎙️ Day ${note.podcastDay} Episode Reflection`
                         ) : note.verse ? (
-                          `📖 Verse ${note.verse}`
+                          `📖 ${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || activeBook.name} ${note.chapter}:${note.verse}`
                         ) : (
                           `📑 ${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || activeBook.name} ${note.chapter}`
                         )}
