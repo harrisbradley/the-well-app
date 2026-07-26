@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, deleteField } from 'firebase/firestore';
 import defaultYoutubeLinks from '../data/youtube-links.json';
 import { extractYouTubeId } from '../utils/youtubeHelper';
 
@@ -54,7 +54,7 @@ export function useDayVideos() {
   };
 
   /**
-   * Saves or clears a custom YouTube video for a given day.
+   * Saves or updates a custom YouTube video for a given day.
    * @param {number|string} day 
    * @param {string} inputUrlOrId 
    */
@@ -63,9 +63,13 @@ export function useDayVideos() {
     const dayStr = String(day);
     const videoId = extractYouTubeId(inputUrlOrId) || inputUrlOrId;
 
+    if (!videoId || !videoId.trim()) {
+      return deleteVideoUrl(day);
+    }
+
     const updated = {
       ...customVideos,
-      [dayStr]: videoId || ''
+      [dayStr]: videoId
     };
 
     try {
@@ -76,9 +80,28 @@ export function useDayVideos() {
     }
   };
 
+  /**
+   * Deletes/clears the custom saved YouTube video URL for a given day in Firestore.
+   * @param {number|string} day 
+   */
+  const deleteVideoUrl = async (day) => {
+    if (!currentUser) return;
+    const dayStr = String(day);
+
+    try {
+      const videoDocRef = doc(db, 'userVideos', currentUser.uid);
+      await setDoc(videoDocRef, {
+        [dayStr]: deleteField()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Failed to delete day video URL:', err);
+    }
+  };
+
   return {
     getVideoForDay,
     saveVideoUrl,
+    deleteVideoUrl,
     loading
   };
 }

@@ -6,6 +6,7 @@ export default function YouTubePlayer({
   dayTitle,
   videoUrl,
   onSaveVideoUrl,
+  onDeleteVideoUrl,
   onClose
 }) {
   const [isMinimized, setIsMinimized] = useState(false);
@@ -25,9 +26,7 @@ export default function YouTubePlayer({
   const handleSave = (e) => {
     e.preventDefault();
     if (!inputUrl.trim()) {
-      onSaveVideoUrl(day, '');
-      setIsEditing(false);
-      setErrorMsg('');
+      handleDelete();
       return;
     }
 
@@ -38,6 +37,17 @@ export default function YouTubePlayer({
     }
 
     onSaveVideoUrl(day, extracted);
+    setIsEditing(false);
+    setErrorMsg('');
+  };
+
+  const handleDelete = () => {
+    if (onDeleteVideoUrl) {
+      onDeleteVideoUrl(day);
+    } else if (onSaveVideoUrl) {
+      onSaveVideoUrl(day, '');
+    }
+    setInputUrl('');
     setIsEditing(false);
     setErrorMsg('');
   };
@@ -221,9 +231,28 @@ export default function YouTubePlayer({
                     textDecoration: 'underline',
                   }}
                 >
-                  🔍 Search YouTube for Day {day}
+                  🔍 Search YouTube
                 </a>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {videoUrl && (
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      title="Clear saved video for this day"
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#FCA5A5',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🗑️ Clear
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -237,7 +266,7 @@ export default function YouTubePlayer({
                     className="btn btn-primary"
                     style={{ padding: '4px 12px', fontSize: '12px' }}
                   >
-                    Save Video
+                    Save
                   </button>
                 </div>
               </div>

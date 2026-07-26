@@ -213,7 +213,7 @@ export default function Reader() {
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   // Custom Day Videos Hook
-  const { getVideoForDay, saveVideoUrl } = useDayVideos();
+  const { getVideoForDay, saveVideoUrl, deleteVideoUrl } = useDayVideos();
 
   // Selected Book and Chapter
   const [activeBook, setActiveBook] = useState(BIBLE_BOOKS[0]); // Default to Genesis
@@ -2294,6 +2294,7 @@ export default function Reader() {
           dayTitle={getReadingsForDay(selectedPodcastDay || matchingDays[0])?.title}
           videoUrl={getVideoForDay(selectedPodcastDay || matchingDays[0])}
           onSaveVideoUrl={saveVideoUrl}
+          onDeleteVideoUrl={deleteVideoUrl}
           onClose={() => setShowVideoPlayer(false)}
         />
       )}
