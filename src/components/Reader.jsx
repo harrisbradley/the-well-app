@@ -2151,7 +2151,86 @@ export default function Reader() {
           flexDirection: 'column',
           gap: '16px',
         }}>
-          {notes.length === 0 ? (
+          {filterMode === 'favorites' ? (
+            favorites.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--text-dim)',
+                textAlign: 'center',
+                padding: '40px 20px',
+              }}>
+                <span style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.7 }}>⭐</span>
+                <p style={{ fontSize: '13px', color: 'var(--text-ivory)' }}>No favorited verses yet.</p>
+                <p style={{ fontSize: '11px', marginTop: '6px' }}>Select any verse and click "⭐ Favorite Verse" in the panel below to bookmark passages.</p>
+              </div>
+            ) : (
+              favorites.map(fav => {
+                const targetBook = BIBLE_BOOKS.find(b => b.id === fav.bookId);
+                const isCurrentChapter = targetBook?.id === activeBook.id && String(fav.chapter) === String(activeChapter);
+                return (
+                  <div
+                    key={fav.id}
+                    onClick={() => {
+                      if (targetBook) {
+                        setActiveBook(targetBook);
+                        setActiveChapter(String(fav.chapter));
+                        const parsedVerses = parseVerseRange(fav.verse);
+                        setActiveSelectedVerses(parsedVerses);
+                        setNewNoteVerse(formatVerseRange(parsedVerses));
+                        setNoteScope('verse');
+                        if (parsedVerses.length > 0) {
+                          setTimeout(() => {
+                            const el = document.getElementById(`verse-${parsedVerses[0]}`);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 100);
+                        }
+                      }
+                    }}
+                    className="glass-panel"
+                    style={{
+                      padding: '14px',
+                      background: isCurrentChapter ? 'rgba(56, 189, 248, 0.12)' : 'rgba(8, 10, 12, 0.4)',
+                      border: isCurrentChapter ? '1px solid #38BDF8' : '1px solid rgba(56, 189, 248, 0.2)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#38BDF8', fontWeight: 600 }}>
+                        ⭐ {targetBook?.name || fav.bookId} {fav.chapter}:{fav.verse}
+                      </span>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (currentUser) {
+                            try {
+                              await deleteDoc(doc(db, 'favorites', fav.id));
+                            } catch (err) {
+                              console.error("Error deleting favorite:", err);
+                            }
+                          } else {
+                            setFavorites(prev => prev.filter(f => f.id !== fav.id));
+                          }
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-slate)', fontSize: '12px', cursor: 'pointer' }}
+                        title="Remove Favorite"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : notes.length === 0 ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
