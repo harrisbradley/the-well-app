@@ -580,12 +580,29 @@ export default function Reader() {
 
   // Favorite Verse Handlers
   const toggleFavoriteVerse = async (verseNum) => {
-    if (!currentUser || !activeBook || !activeChapter || !verseNum) return;
+    if (!activeBook || !activeChapter || !verseNum) return;
     const vStr = String(verseNum);
+    const isFav = favoritedVerses.includes(vStr);
+
+    // Optimistic UI state update
+    if (isFav) {
+      setFavoritedVerses(prev => prev.filter(v => v !== vStr));
+      setFavorites(prev => prev.filter(f => !(f.bookId === activeBook.id && String(f.chapter) === String(activeChapter) && String(f.verse) === vStr)));
+    } else {
+      setFavoritedVerses(prev => [...prev, vStr]);
+      setFavorites(prev => [{
+        id: `${currentUser?.uid || 'guest'}_${activeBook.id}_${activeChapter}_${vStr}`,
+        userId: currentUser?.uid || 'guest',
+        bookId: activeBook.id,
+        chapter: String(activeChapter),
+        verse: vStr,
+        createdAt: Date.now()
+      }, ...prev]);
+    }
+
+    if (!currentUser) return;
     const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}_${vStr}`;
     const docRef = doc(db, 'favorites', docId);
-
-    const isFav = favoritedVerses.includes(vStr);
 
     try {
       if (isFav) {
@@ -602,13 +619,21 @@ export default function Reader() {
         await setDoc(docRef, payload);
       }
     } catch (err) {
-      console.error("Error toggling favorite verse:", err);
+      console.error("Error toggling favorite verse in Firestore:", err);
     }
   };
 
   const toggleFavoriteSelectedVerses = async () => {
-    if (!currentUser || activeSelectedVerses.length === 0) return;
+    if (activeSelectedVerses.length === 0) return;
     const allSelectedAreFav = activeSelectedVerses.every(v => favoritedVerses.includes(String(v)));
+
+    if (allSelectedAreFav) {
+      setFavoritedVerses(prev => prev.filter(v => !activeSelectedVerses.map(String).includes(v)));
+    } else {
+      setFavoritedVerses(prev => Array.from(new Set([...prev, ...activeSelectedVerses.map(String)])));
+    }
+
+    if (!currentUser) return;
 
     for (const vNum of activeSelectedVerses) {
       const vStr = String(vNum);
