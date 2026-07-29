@@ -1812,6 +1812,7 @@ export default function Reader() {
                             );
                           }
 
+                          const isFav = favoritedVerses.includes(verseNum);
                           return (
                             <span 
                               key={verseNum} 
@@ -1822,10 +1823,10 @@ export default function Reader() {
                                 cursor: 'pointer',
                                 background: isSelected 
                                   ? 'rgba(229, 193, 88, 0.28)' 
-                                  : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
+                                  : (isFav ? 'rgba(229, 193, 88, 0.15)' : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent')),
                                 borderBottom: isSelected 
                                   ? '2px solid var(--color-sacred-gold)' 
-                                  : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
+                                  : (isFav ? '1.5px solid rgba(229, 193, 88, 0.6)' : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none')),
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
@@ -1835,14 +1836,39 @@ export default function Reader() {
                             >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
-                                fontSize: '0.6em',
+                                fontSize: '0.65em',
                                 fontWeight: 700,
                                 color: 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
                               }}>
                                 {verseNum}
-                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
+                                {hasNote && <span title="Has Note" style={{ color: 'var(--color-sacred-gold)' }}>📝</span>}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavoriteVerse(verseNum);
+                                  }}
+                                  title={isFav ? "Remove from Favorites" : "Add to Favorites"}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '0 1px',
+                                    margin: 0,
+                                    cursor: 'pointer',
+                                    color: isFav ? 'var(--color-sacred-gold)' : 'rgba(255, 255, 255, 0.25)',
+                                    fontSize: '1.1em',
+                                    lineHeight: 1,
+                                    transition: 'all 0.15s ease',
+                                    transform: isFav ? 'scale(1.15)' : 'scale(1)',
+                                  }}
+                                >
+                                  {isFav ? '★' : '☆'}
+                                </button>
                               </sup>
                               {text}
                             </span>
