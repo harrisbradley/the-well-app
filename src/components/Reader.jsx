@@ -245,6 +245,10 @@ export default function Reader() {
   const [activeNoteId, setActiveNoteId] = useState(null);
   const [noteScope, setNoteScope] = useState('verse'); // 'verse' | 'chapter' | 'day'
 
+  // Favorite Verses States
+  const [favorites, setFavorites] = useState([]);
+  const [favoritedVerses, setFavoritedVerses] = useState([]);
+
   // Layout & Mode States
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notesPanelOpen, setNotesPanelOpen] = useState(true);
@@ -541,6 +545,122 @@ export default function Reader() {
 
     return unsubscribe;
   }, [currentUser, activeBook, activeChapter, activeTranslation]);
+
+  // Firestore Realtime Favorites Listener
+  useEffect(() => {
+    if (!currentUser) {
+      setFavorites([]);
+      setFavoritedVerses([]);
+      return;
+    }
+
+    const favoritesRef = collection(db, 'favorites');
+    const q = query(favoritesRef, where('userId', '==', currentUser.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const favList = [];
+      snapshot.forEach(docSnap => {
+        favList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      favList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setFavorites(favList);
+
+      const currentChapterFavs = favList
+        .filter(f => f.bookId === activeBook.id && String(f.chapter) === String(activeChapter))
+        .map(f => String(f.verse));
+      
+      setFavoritedVerses(currentChapterFavs);
+    }, (err) => {
+      console.error("Firestore favorites stream error:", err);
+    });
+
+    return unsubscribe;
+  }, [currentUser, activeBook, activeChapter]);
+
+  // Favorite Verse Handlers with Optimistic UI Update
+  const toggleFavoriteVerse = async (verseNum) => {
+    if (!activeBook || !activeChapter || !verseNum) return;
+    const vStr = String(verseNum);
+    const isFav = favoritedVerses.includes(vStr);
+
+    // Optimistic local UI state update
+    if (isFav) {
+      setFavoritedVerses(prev => prev.filter(v => v !== vStr));
+      setFavorites(prev => prev.filter(f => !(f.bookId === activeBook.id && String(f.chapter) === String(activeChapter) && String(f.verse) === vStr)));
+    } else {
+      setFavoritedVerses(prev => [...prev, vStr]);
+      setFavorites(prev => [{
+        id: `${currentUser?.uid || 'guest'}_${activeBook.id}_${activeChapter}_${vStr}`,
+        userId: currentUser?.uid || 'guest',
+        bookId: activeBook.id,
+        chapter: String(activeChapter),
+        verse: vStr,
+        createdAt: Date.now()
+      }, ...prev]);
+    }
+
+    if (!currentUser) return;
+    const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}_${vStr}`;
+    const docRef = doc(db, 'favorites', docId);
+
+    try {
+      if (isFav) {
+        await deleteDoc(docRef);
+      } else {
+        const payload = {
+          userId: currentUser.uid,
+          bookId: activeBook.id,
+          chapter: String(activeChapter),
+          verse: vStr,
+          verseRef: `${activeBook.id}_${activeChapter}_${vStr}`,
+          createdAt: Date.now()
+        };
+        await setDoc(docRef, payload);
+      }
+    } catch (err) {
+      console.error("Error toggling favorite verse in Firestore:", err);
+    }
+  };
+
+  const toggleFavoriteSelectedVerses = async () => {
+    if (activeSelectedVerses.length === 0) return;
+    const allSelectedAreFav = activeSelectedVerses.every(v => favoritedVerses.includes(String(v)));
+
+    if (allSelectedAreFav) {
+      setFavoritedVerses(prev => prev.filter(v => !activeSelectedVerses.map(String).includes(v)));
+    } else {
+      setFavoritedVerses(prev => Array.from(new Set([...prev, ...activeSelectedVerses.map(String)])));
+    }
+
+    if (!currentUser) return;
+
+    for (const vNum of activeSelectedVerses) {
+      const vStr = String(vNum);
+      const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}_${vStr}`;
+      const docRef = doc(db, 'favorites', docId);
+
+      try {
+        if (allSelectedAreFav) {
+          await deleteDoc(docRef);
+        } else {
+          if (!favoritedVerses.includes(vStr)) {
+            const payload = {
+              userId: currentUser.uid,
+              bookId: activeBook.id,
+              chapter: String(activeChapter),
+              verse: vStr,
+              verseRef: `${activeBook.id}_${activeChapter}_${vStr}`,
+              createdAt: Date.now()
+            };
+            await setDoc(docRef, payload);
+          }
+        }
+      } catch (err) {
+        console.error("Error batch toggling favorite verses:", err);
+      }
+    }
+  };
 
   // Note CRUD handlers
   const handleAddNote = async (e) => {
@@ -1613,6 +1733,18 @@ export default function Reader() {
                           const parts = text.split(tokenRegex);
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
+                          const isFav = favoritedVerses.includes(verseNum);
+
+                          let verseBg = 'transparent';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+
+                          let verseBorderBottom = 'none';
+                          if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
+                          else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
+                          else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
+                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
 
                           if (parts.length > 1) {
                             return (
@@ -1657,12 +1789,8 @@ export default function Reader() {
                                         style={{ 
                                           marginRight: '8px',
                                           cursor: 'pointer',
-                                          background: isSelected 
-                                            ? 'rgba(229, 193, 88, 0.28)' 
-                                            : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
-                                          borderBottom: isSelected 
-                                            ? '2px solid var(--color-sacred-gold)' 
-                                            : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
+                                          background: verseBg,
+                                          borderBottom: verseBorderBottom,
                                           padding: '2px 4px',
                                           borderRadius: '4px',
                                           transition: 'all 0.2s ease',
@@ -1675,12 +1803,12 @@ export default function Reader() {
                                             fontFamily: 'var(--font-sans)',
                                             fontSize: '0.6em',
                                             fontWeight: 700,
-                                            color: 'var(--color-sacred-gold)',
+                                            color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                             marginRight: '4px',
                                             verticalAlign: 'super',
                                           }}>
                                             {verseNum}
-                                            {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
+                                            {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                                           </sup>
                                         )}
                                         {part.trim()}
@@ -1700,12 +1828,8 @@ export default function Reader() {
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
-                                background: isSelected 
-                                  ? 'rgba(229, 193, 88, 0.28)' 
-                                  : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
-                                borderBottom: isSelected 
-                                  ? '2px solid var(--color-sacred-gold)' 
-                                  : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
+                                background: verseBg,
+                                borderBottom: verseBorderBottom,
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
@@ -1717,12 +1841,12 @@ export default function Reader() {
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
                                 fontWeight: 700,
-                                color: 'var(--color-sacred-gold)',
+                                color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
                               }}>
                                 {verseNum}
-                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
+                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {text}
                             </span>
@@ -1734,6 +1858,19 @@ export default function Reader() {
                           const cleanText = text.replace(/^\*/, '');
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
+                          const isFav = favoritedVerses.includes(verseNum);
+
+                          let verseBg = 'transparent';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+
+                          let verseBorderBottom = 'none';
+                          if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
+                          else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
+                          else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
+                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
+
                           return (
                             <span 
                               key={verseNum} 
@@ -1742,12 +1879,8 @@ export default function Reader() {
                               style={{ 
                                 marginRight: '8px',
                                 cursor: 'pointer',
-                                background: isSelected 
-                                  ? 'rgba(229, 193, 88, 0.28)' 
-                                  : (hasNote ? 'rgba(229, 193, 88, 0.10)' : 'transparent'),
-                                borderBottom: isSelected 
-                                  ? '2px solid var(--color-sacred-gold)' 
-                                  : (hasNote ? '1px dashed rgba(229, 193, 88, 0.7)' : 'none'),
+                                background: verseBg,
+                                borderBottom: verseBorderBottom,
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
@@ -1759,12 +1892,12 @@ export default function Reader() {
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
                                 fontWeight: 700,
-                                color: 'var(--color-sacred-gold)',
+                                color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
                               }}>
                                 {verseNum}
-                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>★</span>}
+                                {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {cleanText}
                             </span>
@@ -1892,7 +2025,7 @@ export default function Reader() {
               transition: 'all 0.2s',
             }}
           >
-            📖 Active Chapter
+            📖 Chapter
           </button>
           
           <button
@@ -1908,7 +2041,7 @@ export default function Reader() {
             }}
             style={{
               flex: 1,
-              padding: '6px 12px',
+              padding: '6px 8px',
               borderRadius: '4px',
               border: 'none',
               background: filterMode === 'day' ? 'rgba(229, 193, 88, 0.12)' : 'transparent',
@@ -1921,7 +2054,27 @@ export default function Reader() {
               transition: 'all 0.2s',
             }}
           >
-            🎙️ Podcast Day
+            🎙️ Day
+          </button>
+
+          <button
+            onClick={() => setFilterMode('favorites')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              borderRadius: '4px',
+              border: 'none',
+              background: filterMode === 'favorites' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              color: filterMode === 'favorites' ? '#38BDF8' : 'var(--text-slate)',
+              fontSize: '11px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            ⭐ Favorites ({favorites.length})
           </button>
         </div>
 
@@ -1962,7 +2115,7 @@ export default function Reader() {
           </div>
         )}
 
-        {/* Notes Timeline Stack */}
+        {/* Notes / Favorites Timeline Stack */}
         <div style={{ 
           flex: 1, 
           overflowY: 'auto', 
@@ -2166,6 +2319,29 @@ export default function Reader() {
               >
                 📑 Chapter ({activeBook.name} {activeChapter})
               </button>
+
+              {activeSelectedVerses.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleFavoriteSelectedVerses}
+                  style={{
+                    background: activeSelectedVerses.every(v => favoritedVerses.includes(String(v))) 
+                      ? 'rgba(56, 189, 248, 0.25)' 
+                      : 'rgba(56, 189, 248, 0.12)',
+                    color: '#38BDF8',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    borderRadius: '12px',
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    marginLeft: 'auto',
+                  }}
+                >
+                  {activeSelectedVerses.every(v => favoritedVerses.includes(String(v))) ? '★ Favorited' : '⭐ Favorite Verse'}
+                </button>
+              )}
 
               {(selectedPodcastDay || (matchingDays && matchingDays.length > 0)) && (
                 <>
