@@ -295,7 +295,7 @@ export default function Reader() {
     setLoading(true);
     setError(null);
 
-    const url = `https://raw.githubusercontent.com/xxruyle/Bible-DouayRheims/main/Douay-Rheims/${encodeURIComponent(activeBook.filename)}`;
+    const url = `/douay-rheims/${encodeURIComponent(activeBook.filename)}`;
 
     fetch(url)
       .then(res => {
@@ -990,7 +990,7 @@ export default function Reader() {
                     outline: 'none',
                   }}
                 >
-                  <option value="douay-rheims" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>Douay-Rheims (CDN)</option>
+                  <option value="douay-rheims" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>Douay-Rheims (Local)</option>
                   <option value="rsv-ce" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>RSV-CE (My Copy)</option>
                 </select>
               )}
