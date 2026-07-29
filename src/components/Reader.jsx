@@ -566,11 +566,14 @@ export default function Reader() {
       favList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setFavorites(favList);
 
-      const currentChapterFavs = favList
+      const currentChapterFavVerses = new Set();
+      favList
         .filter(f => f.bookId === activeBook.id && String(f.chapter) === String(activeChapter))
-        .map(f => String(f.verse));
+        .forEach(f => {
+          parseVerseRange(f.verse).forEach(v => currentChapterFavVerses.add(String(v)));
+        });
       
-      setFavoritedVerses(currentChapterFavs);
+      setFavoritedVerses(Array.from(currentChapterFavVerses));
     }, (err) => {
       console.error("Firestore favorites stream error:", err);
     });
@@ -578,86 +581,110 @@ export default function Reader() {
     return unsubscribe;
   }, [currentUser, activeBook, activeChapter]);
 
-  // Favorite Verse Handlers with Optimistic UI Update
+  // Favorite Verse Handlers with Range Support & Optimistic UI Update
   const toggleFavoriteVerse = async (verseNum) => {
     if (!activeBook || !activeChapter || !verseNum) return;
     const vStr = String(verseNum);
     const isFav = favoritedVerses.includes(vStr);
 
-    // Optimistic local UI state update
     if (isFav) {
       setFavoritedVerses(prev => prev.filter(v => v !== vStr));
-      setFavorites(prev => prev.filter(f => !(f.bookId === activeBook.id && String(f.chapter) === String(activeChapter) && String(f.verse) === vStr)));
+      const matchingFavDocs = favorites.filter(f => 
+        f.bookId === activeBook.id && 
+        String(f.chapter) === String(activeChapter) && 
+        parseVerseRange(f.verse).includes(vStr)
+      );
+      const docIdsToRemove = new Set(matchingFavDocs.map(f => f.id));
+      setFavorites(prev => prev.filter(f => !docIdsToRemove.has(f.id)));
+
+      if (currentUser) {
+        for (const fDoc of matchingFavDocs) {
+          try {
+            await deleteDoc(doc(db, 'favorites', fDoc.id));
+          } catch (err) {
+            console.error("Error deleting favorite doc:", err);
+          }
+        }
+      }
     } else {
       setFavoritedVerses(prev => [...prev, vStr]);
+      const tempId = `temp_${Date.now()}`;
       setFavorites(prev => [{
-        id: `${currentUser?.uid || 'guest'}_${activeBook.id}_${activeChapter}_${vStr}`,
+        id: tempId,
         userId: currentUser?.uid || 'guest',
         bookId: activeBook.id,
         chapter: String(activeChapter),
         verse: vStr,
         createdAt: Date.now()
       }, ...prev]);
-    }
 
-    if (!currentUser) return;
-    const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}_${vStr}`;
-    const docRef = doc(db, 'favorites', docId);
-
-    try {
-      if (isFav) {
-        await deleteDoc(docRef);
-      } else {
-        const payload = {
-          userId: currentUser.uid,
-          bookId: activeBook.id,
-          chapter: String(activeChapter),
-          verse: vStr,
-          verseRef: `${activeBook.id}_${activeChapter}_${vStr}`,
-          createdAt: Date.now()
-        };
-        await setDoc(docRef, payload);
+      if (currentUser) {
+        try {
+          await addDoc(collection(db, 'favorites'), {
+            userId: currentUser.uid,
+            bookId: activeBook.id,
+            chapter: String(activeChapter),
+            verse: vStr,
+            createdAt: Date.now()
+          });
+        } catch (err) {
+          console.error("Error adding favorite to Firestore:", err);
+        }
       }
-    } catch (err) {
-      console.error("Error toggling favorite verse in Firestore:", err);
     }
   };
 
   const toggleFavoriteSelectedVerses = async () => {
-    if (activeSelectedVerses.length === 0) return;
+    if (!activeBook || !activeChapter || activeSelectedVerses.length === 0) return;
+    const formattedVerseStr = formatVerseRange(activeSelectedVerses);
+    const selectedVersesSet = new Set(activeSelectedVerses.map(String));
+
+    const matchingFavDocs = favorites.filter(f => 
+      f.bookId === activeBook.id && 
+      String(f.chapter) === String(activeChapter) && 
+      parseVerseRange(f.verse).some(v => selectedVersesSet.has(String(v)))
+    );
+
     const allSelectedAreFav = activeSelectedVerses.every(v => favoritedVerses.includes(String(v)));
 
     if (allSelectedAreFav) {
-      setFavoritedVerses(prev => prev.filter(v => !activeSelectedVerses.map(String).includes(v)));
-    } else {
-      setFavoritedVerses(prev => Array.from(new Set([...prev, ...activeSelectedVerses.map(String)])));
-    }
+      setFavoritedVerses(prev => prev.filter(v => !selectedVersesSet.has(v)));
+      const docIdsToRemove = new Set(matchingFavDocs.map(f => f.id));
+      setFavorites(prev => prev.filter(f => !docIdsToRemove.has(f.id)));
 
-    if (!currentUser) return;
-
-    for (const vNum of activeSelectedVerses) {
-      const vStr = String(vNum);
-      const docId = `${currentUser.uid}_${activeBook.id}_${activeChapter}_${vStr}`;
-      const docRef = doc(db, 'favorites', docId);
-
-      try {
-        if (allSelectedAreFav) {
-          await deleteDoc(docRef);
-        } else {
-          if (!favoritedVerses.includes(vStr)) {
-            const payload = {
-              userId: currentUser.uid,
-              bookId: activeBook.id,
-              chapter: String(activeChapter),
-              verse: vStr,
-              verseRef: `${activeBook.id}_${activeChapter}_${vStr}`,
-              createdAt: Date.now()
-            };
-            await setDoc(docRef, payload);
+      if (currentUser) {
+        for (const fDoc of matchingFavDocs) {
+          try {
+            await deleteDoc(doc(db, 'favorites', fDoc.id));
+          } catch (err) {
+            console.error("Error deleting favorite doc:", err);
           }
         }
-      } catch (err) {
-        console.error("Error batch toggling favorite verses:", err);
+      }
+    } else {
+      setFavoritedVerses(prev => Array.from(new Set([...prev, ...activeSelectedVerses.map(String)])));
+      const tempId = `temp_${Date.now()}`;
+      setFavorites(prev => [{
+        id: tempId,
+        userId: currentUser?.uid || 'guest',
+        bookId: activeBook.id,
+        chapter: String(activeChapter),
+        verse: formattedVerseStr,
+        createdAt: Date.now()
+      }, ...prev]);
+
+      if (currentUser) {
+        try {
+          await addDoc(collection(db, 'favorites'), {
+            userId: currentUser.uid,
+            bookId: activeBook.id,
+            chapter: String(activeChapter),
+            verse: formattedVerseStr,
+            createdAt: Date.now()
+          });
+        } catch (err) {
+          console.error("Error adding range favorite to Firestore:", err);
+        }
       }
     }
   };
