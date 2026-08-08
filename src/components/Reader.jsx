@@ -243,21 +243,47 @@ export default function Reader() {
   const [favorites, setFavorites] = useState([]);
   const [favoritedVerses, setFavoritedVerses] = useState([]);
 
-  // Layout & Mode States
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
-  const [notesPanelOpen, setNotesPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+  // Layout & Mode States - Responsive threshold for tablets (< 1024px) and mobile screens
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+  const [notesPanelOpen, setNotesPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
   const [ascensionMode, setAscensionMode] = useState(true); // Default to Ascension Companion Mode
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) {
+        // Automatically close sidebars if screen is resized to tablet/mobile dimensions
+        setSidebarOpen(false);
+        setNotesPanelOpen(false);
+      }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      if (next && isMobile) {
+        setNotesPanelOpen(false); // Close reflections panel if opening books panel on tablet/mobile
+      }
+      return next;
+    });
+  };
+
+  const toggleNotesPanel = () => {
+    setNotesPanelOpen(prev => {
+      const next = !prev;
+      if (next && isMobile) {
+        setSidebarOpen(false); // Close books panel if opening reflections panel on tablet/mobile
+      }
+      return next;
+    });
+  };
 
   // Category navigation state
   const [expandedCategories, setExpandedCategories] = useState({
@@ -1073,7 +1099,7 @@ export default function Reader() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                 <button
-                  onClick={() => setSidebarOpen(prev => !prev)}
+                  onClick={toggleSidebar}
                   title="Toggle Books Sidebar"
                   style={{
                     background: sidebarOpen ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
@@ -1094,7 +1120,7 @@ export default function Reader() {
                 </button>
 
                 <h2 
-                  onClick={() => isMobile && setSidebarOpen(true)}
+                  onClick={() => isMobile && toggleSidebar()}
                   style={{
                     fontFamily: 'var(--font-serif)',
                     fontSize: isMobile ? '16px' : '20px',
@@ -1131,7 +1157,7 @@ export default function Reader() {
               {/* Right actions: Reflections & Matrix */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                 <button
-                  onClick={() => setNotesPanelOpen(prev => !prev)}
+                  onClick={toggleNotesPanel}
                   title="Toggle Reflections Notes Drawer"
                   style={{
                     background: notesPanelOpen ? 'rgba(229, 193, 88, 0.15)' : 'rgba(255, 255, 255, 0.05)',
