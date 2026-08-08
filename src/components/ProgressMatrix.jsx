@@ -13,8 +13,7 @@ import {
 } from 'firebase/firestore';
 import { BIBLE_BOOKS } from '../data/books';
 import readingPlan from '../data/reading-plan.json';
-import YouTubePlayer from './YouTubePlayer';
-import { useDayVideos } from '../hooks/useDayVideos';
+
 
 const PERIOD_COLORS = {
   "Early World": "#00B4D8",
@@ -104,8 +103,7 @@ export default function ProgressMatrix() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  const { getVideoForDay, hasCustomVideo, saveVideoUrl, deleteVideoUrl } = useDayVideos();
-  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+
 
   // Progress states
   const [completedDays, setCompletedDays] = useState([]);
@@ -633,22 +631,7 @@ export default function ProgressMatrix() {
                 Open Reader →
               </button>
 
-              {/* Watch Video Button */}
-              <button
-                onClick={() => setShowVideoPlayer(true)}
-                className="btn btn-secondary"
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  background: 'rgba(229, 193, 88, 0.12)',
-                  borderColor: 'rgba(229, 193, 88, 0.4)',
-                  color: 'var(--color-sacred-gold)',
-                }}
-              >
-                📺 Watch Video
-              </button>
+
             </div>
 
             {/* Quick Reflections Journal Section */}
@@ -737,18 +720,7 @@ export default function ProgressMatrix() {
         </div>
       )}
 
-      {/* Floating YouTube Video Player */}
-      {showVideoPlayer && selectedDayInfo && (
-        <YouTubePlayer
-          day={selectedDayInfo.day}
-          dayTitle={selectedDayInfo.title}
-          videoUrl={getVideoForDay(selectedDayInfo.day)}
-          isCustomVideo={hasCustomVideo(selectedDayInfo.day)}
-          onSaveVideoUrl={saveVideoUrl}
-          onDeleteVideoUrl={deleteVideoUrl}
-          onClose={() => setShowVideoPlayer(false)}
-        />
-      )}
+
     </div>
   );
 }

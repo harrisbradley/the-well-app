@@ -15,8 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getDaysForVerse, getReadingsForDay } from '../data/planHelper';
-import YouTubePlayer from './YouTubePlayer';
-import { useDayVideos } from '../hooks/useDayVideos';
+
 
 const PERIOD_COLORS = {
   "Early World": "#00B4D8",
@@ -207,13 +206,8 @@ export default function Reader() {
   // Search Parameters & Daily Plan Mode States
   const [searchParams, setSearchParams] = useSearchParams();
   const dayParam = searchParams.get('day');
-  const videoParam = searchParams.get('video');
   const [selectedPodcastDay, setSelectedPodcastDay] = useState(null);
   const [filterMode, setFilterMode] = useState('chapter'); // 'chapter' or 'day'
-  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
-
-  // Custom Day Videos Hook
-  const { getVideoForDay, hasCustomVideo, saveVideoUrl, deleteVideoUrl } = useDayVideos();
 
   // Selected Book and Chapter
   const [activeBook, setActiveBook] = useState(BIBLE_BOOKS[0]); // Default to Genesis
@@ -451,9 +445,6 @@ export default function Reader() {
       if (dayNum >= 1 && dayNum <= 365) {
         setSelectedPodcastDay(dayNum);
         setFilterMode('day');
-        if (videoParam === '1') {
-          setShowVideoPlayer(true);
-        }
         
         // Find readings for this day
         const planEntry = getReadingsForDay(dayNum);
@@ -468,7 +459,7 @@ export default function Reader() {
         }
       }
     }
-  }, [dayParam, videoParam]);
+  }, [dayParam]);
 
   // Firestore Real-Time Notes Listener
   useEffect(() => {
@@ -1277,25 +1268,7 @@ export default function Reader() {
                   </button>
                 );
               })}
-              <button
-                onClick={() => setShowVideoPlayer(!showVideoPlayer)}
-                style={{
-                  background: showVideoPlayer ? 'var(--color-sacred-gold)' : 'rgba(229, 193, 88, 0.15)',
-                  border: '1px solid rgba(229, 193, 88, 0.4)',
-                  borderRadius: '16px',
-                  padding: '4px 12px',
-                  color: showVideoPlayer ? 'var(--bg-midnight)' : 'var(--color-sacred-gold)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  marginLeft: '8px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                📺 {showVideoPlayer ? 'Hide Video' : 'Watch Video'}
-              </button>
+
               <button
                 onClick={() => navigate(`/matrix?day=${selectedPodcastDay}`)}
                 style={{
@@ -2472,23 +2445,7 @@ export default function Reader() {
                   >
                     🎙️ Day {selectedPodcastDay || matchingDays[0]} Episode
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowVideoPlayer(true)}
-                    style={{
-                      background: 'rgba(229, 193, 88, 0.12)',
-                      color: 'var(--color-sacred-gold)',
-                      border: '1px solid rgba(229, 193, 88, 0.3)',
-                      borderRadius: '12px',
-                      padding: '3px 10px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    📺 Watch Video
-                  </button>
+
                 </>
               )}
             </div>
@@ -2569,18 +2526,7 @@ export default function Reader() {
         </div>
       </aside>
 
-      {/* Floating YouTube Video Player */}
-      {showVideoPlayer && (selectedPodcastDay || (matchingDays && matchingDays.length > 0)) && (
-        <YouTubePlayer
-          day={selectedPodcastDay || matchingDays[0]}
-          dayTitle={getReadingsForDay(selectedPodcastDay || matchingDays[0])?.title}
-          videoUrl={getVideoForDay(selectedPodcastDay || matchingDays[0])}
-          isCustomVideo={hasCustomVideo(selectedPodcastDay || matchingDays[0])}
-          onSaveVideoUrl={saveVideoUrl}
-          onDeleteVideoUrl={deleteVideoUrl}
-          onClose={() => setShowVideoPlayer(false)}
-        />
-      )}
+
 
       {/* Embedded CSS for spin animations */}
       <style>{`
