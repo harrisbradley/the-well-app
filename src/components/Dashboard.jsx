@@ -23,10 +23,12 @@ export default function Dashboard() {
     }}>
       <header style={{
         maxWidth: '1000px',
-        margin: '0 auto 40px auto',
+        margin: '0 auto 32px auto',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '16px',
         borderBottom: '1px solid rgba(229, 193, 88, 0.1)',
         paddingBottom: '20px',
       }}>
@@ -58,14 +60,14 @@ export default function Dashboard() {
           </h1>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--text-slate)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-slate)' }}>
             {currentUser?.email || 'Guest User'}
           </span>
           <button 
             className="btn btn-secondary" 
             onClick={handleLogout}
-            style={{ padding: '8px 16px', fontSize: '13px' }}
+            style={{ padding: '6px 14px', fontSize: '12px' }}
           >
             Sign Out
           </button>
@@ -73,7 +75,7 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        <div className="glass-panel fade-in" style={{ padding: '40px', textAlign: 'center', marginBottom: '32px' }}>
+        <div className="glass-panel fade-in" style={{ padding: '24px 20px', textAlign: 'center', marginBottom: '32px' }}>
           <h2 style={{
             fontFamily: 'var(--font-serif)',
             fontSize: '28px',

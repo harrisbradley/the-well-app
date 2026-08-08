@@ -429,8 +429,8 @@ export default function ProgressMatrix() {
                 {/* Grid of Days */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(48px, 1fr))',
-                  gap: '10px',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))',
+                  gap: '8px',
                 }}>
                   {days.map(day => {
                     const isCompleted = completedDays.includes(day.day);
@@ -442,7 +442,7 @@ export default function ProgressMatrix() {
                         onClick={() => setSelectedDayNum(day.day)}
                         className="glass-panel-interactive"
                         style={{
-                          height: '48px',
+                          height: '42px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -494,20 +494,22 @@ export default function ProgressMatrix() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 999,
-          padding: '24px',
+          padding: '16px',
         }} onClick={() => setSelectedDayNum(null)}>
           <div 
             className="glass-panel fade-in" 
             style={{
               maxWidth: '540px',
               width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               background: 'var(--bg-deep-charcoal)',
               border: `1px solid ${PERIOD_COLORS[selectedDayInfo.period]}40`,
               borderRadius: '16px',
-              padding: '28px',
+              padding: '20px 18px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '20px',
+              gap: '16px',
               boxShadow: `0 0 30px ${PERIOD_COLORS[selectedDayInfo.period]}20`,
             }}
             onClick={(e) => e.stopPropagation()}
