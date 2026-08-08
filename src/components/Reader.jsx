@@ -551,7 +551,7 @@ export default function Reader() {
     // Clear previous chapter's content to avoid a flash of stale text while loading
     setCustomVerses(null);
 
-    if (!currentUser || !activeBook || activeTranslation !== 'rsv-ce') {
+    if (!currentUser || !activeBook) {
       return;
     }
 
@@ -559,18 +559,21 @@ export default function Reader() {
     const docRef = doc(db, 'customScriptures', docId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCustomVerses(docSnap.data().verses || {});
+      if (docSnap.exists() && docSnap.data().verses && Object.keys(docSnap.data().verses).length > 0) {
+        setCustomVerses(docSnap.data().verses);
+        setActiveTranslation('rsv-ce');
       } else {
         setCustomVerses(null);
+        setActiveTranslation('douay-rheims');
       }
     }, (err) => {
       console.error("Firestore custom scriptures fetch error:", err);
-      setCustomVerses(null); // Ensure state is reset if fetch fails (e.g. permission or network issues)
+      setCustomVerses(null);
+      setActiveTranslation('douay-rheims');
     });
 
     return unsubscribe;
-  }, [currentUser, activeBook, activeChapter, activeTranslation]);
+  }, [currentUser, activeBook, activeChapter]);
 
   // Firestore Realtime Favorites Listener
   useEffect(() => {
@@ -1208,7 +1211,12 @@ export default function Reader() {
               {/* Middle Toolbar Toggles */}
               <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
                 <button
-                  onClick={() => setAscensionMode(false)}
+                  onClick={() => {
+                    setAscensionMode(false);
+                    if (customVerses) {
+                      setActiveTranslation('rsv-ce');
+                    }
+                  }}
                   style={{
                     padding: '4px 10px',
                     borderRadius: '4px',
