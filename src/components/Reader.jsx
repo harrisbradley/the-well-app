@@ -243,12 +243,47 @@ export default function Reader() {
   const [favorites, setFavorites] = useState([]);
   const [favoritedVerses, setFavoritedVerses] = useState([]);
 
-  // Layout & Mode States
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [notesPanelOpen, setNotesPanelOpen] = useState(true);
+  // Layout & Mode States - Responsive threshold for tablets (< 1024px) and mobile screens
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+  const [notesPanelOpen, setNotesPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
   const [ascensionMode, setAscensionMode] = useState(true); // Default to Ascension Companion Mode
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) {
+        // Automatically close sidebars if screen is resized to tablet/mobile dimensions
+        setSidebarOpen(false);
+        setNotesPanelOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      if (next && isMobile) {
+        setNotesPanelOpen(false); // Close reflections panel if opening books panel on tablet/mobile
+      }
+      return next;
+    });
+  };
+
+  const toggleNotesPanel = () => {
+    setNotesPanelOpen(prev => {
+      const next = !prev;
+      if (next && isMobile) {
+        setSidebarOpen(false); // Close books panel if opening reflections panel on tablet/mobile
+      }
+      return next;
+    });
+  };
 
   // Category navigation state
   const [expandedCategories, setExpandedCategories] = useState({
@@ -516,7 +551,7 @@ export default function Reader() {
     // Clear previous chapter's content to avoid a flash of stale text while loading
     setCustomVerses(null);
 
-    if (!currentUser || !activeBook || activeTranslation !== 'rsv-ce') {
+    if (!currentUser || !activeBook) {
       return;
     }
 
@@ -524,18 +559,21 @@ export default function Reader() {
     const docRef = doc(db, 'customScriptures', docId);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCustomVerses(docSnap.data().verses || {});
+      if (docSnap.exists() && docSnap.data().verses && Object.keys(docSnap.data().verses).length > 0) {
+        setCustomVerses(docSnap.data().verses);
+        setActiveTranslation('rsv-ce');
       } else {
         setCustomVerses(null);
+        setActiveTranslation('douay-rheims');
       }
     }, (err) => {
       console.error("Firestore custom scriptures fetch error:", err);
-      setCustomVerses(null); // Ensure state is reset if fetch fails (e.g. permission or network issues)
+      setCustomVerses(null);
+      setActiveTranslation('douay-rheims');
     });
 
     return unsubscribe;
-  }, [currentUser, activeBook, activeChapter, activeTranslation]);
+  }, [currentUser, activeBook, activeChapter]);
 
   // Firestore Realtime Favorites Listener
   useEffect(() => {
@@ -798,10 +836,12 @@ export default function Reader() {
   const handleBookChange = (book) => {
     setActiveBook(book);
     setActiveChapter('1');
+    if (isMobile) setSidebarOpen(false);
   };
 
   const handleChapterChange = (chapterNum) => {
     setActiveChapter(String(chapterNum));
+    if (isMobile) setSidebarOpen(false);
   };
 
   const handleLogout = async () => {
@@ -854,9 +894,29 @@ export default function Reader() {
       color: 'var(--text-ivory)',
     }}>
       
+      {/* Mobile Backdrop Overlay for Left Sidebar */}
+      {isMobile && sidebarOpen && !distractionFree && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5, 7, 9, 0.75)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 998,
+          }}
+        />
+      )}
+
       {/* 1. LEFT SIDEBAR NAVIGATION */}
       <aside style={{
-        width: sidebarOpen && !distractionFree ? '320px' : '0px',
+        position: isMobile ? 'fixed' : 'relative',
+        top: isMobile ? 0 : 'auto',
+        left: isMobile ? 0 : 'auto',
+        height: isMobile ? '100vh' : '100%',
+        width: sidebarOpen && !distractionFree ? (isMobile ? '85vw' : '320px') : '0px',
+        maxWidth: isMobile ? '340px' : 'none',
         opacity: sidebarOpen && !distractionFree ? 1 : 0,
         transform: sidebarOpen && !distractionFree ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'width var(--transition-normal), opacity var(--transition-normal), transform var(--transition-normal)',
@@ -865,7 +925,8 @@ export default function Reader() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        zIndex: 5,
+        zIndex: 999,
+        boxShadow: isMobile && sidebarOpen ? '4px 0 24px rgba(0, 0, 0, 0.8)' : 'none',
       }}>
         {/* Sidebar Header */}
         <div style={{
@@ -1019,97 +1080,173 @@ export default function Reader() {
         {/* Reading Header Toolbar */}
         {!distractionFree && (
           <header style={{
-            height: '64px',
+            minHeight: isMobile ? 'auto' : '64px',
             borderBottom: '1px solid rgba(229, 193, 88, 0.12)',
-            padding: '0 24px',
+            padding: isMobile ? '10px 14px' : '0 24px',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
             justifyContent: 'space-between',
+            gap: isMobile ? '10px' : '16px',
             background: 'var(--bg-glass)',
             backdropFilter: 'blur(10px)',
             zIndex: 4,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {!sidebarOpen && (
+            {/* Top Bar: Book Navigation & Title & Notes Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              gap: '8px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                 <button
-                  onClick={() => setSidebarOpen(true)}
+                  onClick={toggleSidebar}
+                  title="Toggle Books Sidebar"
                   style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(229, 193, 88, 0.2)',
-                    borderRadius: '4px',
-                    padding: '8px 12px',
+                    background: sidebarOpen ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.3)',
+                    borderRadius: '6px',
+                    padding: isMobile ? '6px 10px' : '8px 12px',
+                    color: sidebarOpen ? 'var(--bg-midnight)' : 'var(--color-sacred-gold)',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    flexShrink: 0,
+                  }}
+                >
+                  📖 <span style={{ display: isMobile ? 'none' : 'inline' }}>Books</span>
+                </button>
+
+                <h2 
+                  onClick={() => isMobile && toggleSidebar()}
+                  style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: isMobile ? '16px' : '20px',
                     color: 'var(--color-sacred-gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    margin: 0,
+                    cursor: isMobile ? 'pointer' : 'default',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  <span>{activeBook.name} {activeChapter}</span>
+                  {matchingDays.length > 0 && (
+                    <span style={{
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-sans)',
+                      color: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
+                      border: `1px solid ${PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'rgba(229, 193, 88, 0.2)'}`,
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      flexShrink: 0,
+                    }}>
+                      {matchingDays.map(d => `Day ${d}`).join(', ')}
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {/* Right actions: Reflections & Matrix */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <button
+                  onClick={toggleNotesPanel}
+                  title="Toggle Reflections Notes Drawer"
+                  style={{
+                    background: notesPanelOpen ? 'rgba(229, 193, 88, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.3)',
+                    borderRadius: '6px',
+                    padding: isMobile ? '6px 10px' : '8px 14px',
+                    color: 'var(--color-sacred-gold)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  📝 <span style={{ display: isMobile ? 'none' : 'inline' }}>Reflections</span> {notes.length > 0 ? `(${notes.length})` : ''}
+                </button>
+
+                <button
+                  onClick={() => navigate(selectedPodcastDay ? `/matrix?day=${selectedPodcastDay}` : '/matrix')}
+                  title="Progress Matrix"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    borderRadius: '6px',
+                    padding: isMobile ? '6px 10px' : '8px 14px',
+                    color: 'var(--color-sacred-gold)',
+                    fontSize: '12px',
+                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
-                  ☰ Books
+                  📊 <span style={{ display: isMobile ? 'none' : 'inline' }}>Matrix</span>
                 </button>
-              )}
+              </div>
+            </div>
 
-              <h2 style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '20px',
-                color: 'var(--color-sacred-gold)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-              }}>
-                <span>{activeBook.name} {activeChapter}</span>
-                {matchingDays.length > 0 && (
-                  <span style={{
+            {/* Second Row: Mode, Translation & Font controls */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobile ? 'space-between' : 'flex-end',
+              gap: '8px',
+              flexWrap: 'wrap',
+              width: '100%',
+            }}>
+              {/* Middle Toolbar Toggles */}
+              <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
+                <button
+                  onClick={() => {
+                    setAscensionMode(false);
+                    if (customVerses) {
+                      setActiveTranslation('rsv-ce');
+                    }
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
                     fontSize: '11px',
-                    fontFamily: 'var(--font-sans)',
-                    color: PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'var(--color-sacred-gold)',
-                    border: `1px solid ${PERIOD_COLORS[getReadingsForDay(matchingDays[0])?.period] || 'rgba(229, 193, 88, 0.2)'}`,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
                     fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}>
-                    {matchingDays.map(d => `Day ${d}`).join(', ')}
-                  </span>
-                )}
-              </h2>
-            </div>
+                    cursor: 'pointer',
+                    background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                    color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  }}
+                >
+                  Translation
+                </button>
+                <button
+                  onClick={() => setAscensionMode(true)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                    color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                  }}
+                >
+                  Ascension
+                </button>
+              </div>
 
-            {/* Middle Toolbar Toggles */}
-            <div style={{ display: 'flex', gap: '4px', background: 'rgba(8, 10, 12, 0.6)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
-              <button
-                onClick={() => setAscensionMode(false)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                  color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                Read Translation
-              </button>
-              <button
-                onClick={() => setAscensionMode(true)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                  color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                Ascension Companion
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {/* Translation Selection Selector */}
               {!ascensionMode && (
                 <select
@@ -1120,16 +1257,16 @@ export default function Reader() {
                     border: '1px solid rgba(229, 193, 88, 0.2)',
                     borderRadius: '6px',
                     color: 'var(--color-sacred-gold)',
-                    padding: '6px 12px',
-                    fontSize: '12px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
                     fontFamily: 'var(--font-sans)',
                     fontWeight: 600,
                     cursor: 'pointer',
                     outline: 'none',
                   }}
                 >
-                  <option value="douay-rheims" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>Douay-Rheims (Local)</option>
-                  <option value="rsv-ce" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>RSV-CE (My Copy)</option>
+                  <option value="douay-rheims" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>Douay-Rheims</option>
+                  <option value="rsv-ce" style={{ background: 'var(--bg-midnight)', color: 'var(--text-ivory)' }}>RSV-CE</option>
                 </select>
               )}
 
@@ -1138,67 +1275,30 @@ export default function Reader() {
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <button 
                     onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
-                    style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
+                    style={{ padding: '4px 8px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '11px' }}
                   >
                     A-
                   </button>
-                  <span style={{ fontSize: '12px', color: 'var(--text-dim)', padding: '0 4px' }}>{fontSize}px</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '0 2px' }}>{fontSize}px</span>
                   <button 
                     onClick={() => setFontSize(prev => Math.min(26, prev + 2))}
-                    style={{ padding: '6px 12px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '13px' }}
+                    style={{ padding: '4px 8px', border: 'none', background: 'transparent', color: 'var(--text-slate)', cursor: 'pointer', fontSize: '11px' }}
                   >
                     A+
                   </button>
                 </div>
               )}
-
-              {/* Reflections toggle button */}
-              <button
-                onClick={() => setNotesPanelOpen(prev => !prev)}
-                style={{
-                  background: notesPanelOpen ? 'rgba(229, 193, 88, 0.15)' : 'transparent',
-                  border: '1px solid rgba(229, 193, 88, 0.2)',
-                  borderRadius: '6px',
-                  padding: '8px 14px',
-                  color: 'var(--color-sacred-gold)',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
-                📝 Reflections {notes.length > 0 ? `(${notes.length})` : ''}
-              </button>
-
-              {/* Progress Matrix navigation button */}
-              <button
-                onClick={() => navigate(selectedPodcastDay ? `/matrix?day=${selectedPodcastDay}` : '/matrix')}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(229, 193, 88, 0.2)',
-                  borderRadius: '6px',
-                  padding: '8px 14px',
-                  color: 'var(--color-sacred-gold)',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-                title="Go to Progress Matrix"
-              >
-                📊 Matrix
-              </button>
-
+              {/* Focus Mode */}
               <button
                 onClick={() => setDistractionFree(true)}
                 style={{
                   background: 'transparent',
                   border: '1px solid rgba(229, 193, 88, 0.2)',
                   borderRadius: '6px',
-                  padding: '8px 14px',
+                  padding: '4px 8px',
                   color: 'var(--color-sacred-gold)',
                   fontFamily: 'var(--font-sans)',
-                  fontSize: '13px',
+                  fontSize: '11px',
                   fontWeight: 500,
                   cursor: 'pointer',
                 }}
@@ -1952,9 +2052,29 @@ export default function Reader() {
 
       </main>
 
+      {/* Mobile Backdrop Overlay for Right Notes Drawer */}
+      {isMobile && notesPanelOpen && !distractionFree && (
+        <div
+          onClick={() => setNotesPanelOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5, 7, 9, 0.75)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 998,
+          }}
+        />
+      )}
+
       {/* 3. RIGHT SIDEBAR: REFLECTIONS & NOTE STACKING */}
       <aside style={{
-        width: notesPanelOpen && !distractionFree ? '360px' : '0px',
+        position: isMobile ? 'fixed' : 'relative',
+        top: isMobile ? 0 : 'auto',
+        right: isMobile ? 0 : 'auto',
+        height: isMobile ? '100vh' : '100%',
+        width: notesPanelOpen && !distractionFree ? (isMobile ? '90vw' : '360px') : '0px',
+        maxWidth: isMobile ? '380px' : 'none',
         opacity: notesPanelOpen && !distractionFree ? 1 : 0,
         transform: notesPanelOpen && !distractionFree ? 'translateX(0)' : 'translateX(100%)',
         transition: 'width var(--transition-normal), opacity var(--transition-normal), transform var(--transition-normal)',
@@ -1963,7 +2083,8 @@ export default function Reader() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        zIndex: 5,
+        zIndex: 999,
+        boxShadow: isMobile && notesPanelOpen ? '-4px 0 24px rgba(0, 0, 0, 0.8)' : 'none',
       }}>
         {/* Reflections Header */}
         <div style={{
