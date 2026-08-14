@@ -265,7 +265,13 @@ export default function Reader() {
   const [notesPanelOpen, setNotesPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
-  const [ascensionMode, setAscensionMode] = useState(true); // Default to Ascension Companion Mode
+  const [ascensionMode, setAscensionMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('gospel')) return false;
+    }
+    return true;
+  }); // Default to Ascension Companion Mode for BIAY, Translation for Gospel
 
   useEffect(() => {
     const handleResize = () => {
@@ -511,6 +517,7 @@ export default function Reader() {
         }
       }
     } else if (gospelParam) {
+      setAscensionMode(false);
       const targetDateStr = gospelParam === 'today' ? formatDateKey(new Date()) : gospelParam;
       setSelectedGospelDate(targetDateStr);
       setSelectedPodcastDay(null);
@@ -1229,6 +1236,7 @@ export default function Reader() {
                       setSelectedGospelDate(null);
                       setSearchParams({});
                     } else {
+                      setAscensionMode(false);
                       navigate('/reader?gospel=today');
                     }
                   }}
@@ -1301,47 +1309,49 @@ export default function Reader() {
               flexWrap: 'wrap',
               width: '100%',
             }}>
-              {/* Middle Toolbar Toggles */}
-              <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
-                <button
-                  onClick={() => {
-                    setAscensionMode(false);
-                    if (customVerses) {
-                      setActiveTranslation('rsv-ce');
-                    }
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  }}
-                >
-                  Translation
-                </button>
-                <button
-                  onClick={() => setAscensionMode(true)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  }}
-                >
-                  Ascension
-                </button>
-              </div>
+              {/* Middle Toolbar Toggles - Only show Ascension mode toggle for BIAY Plan, exclude in Daily Gospel */}
+              {!selectedGospelDate && (
+                <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
+                  <button
+                    onClick={() => {
+                      setAscensionMode(false);
+                      if (customVerses) {
+                        setActiveTranslation('rsv-ce');
+                      }
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                      color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    }}
+                  >
+                    Translation
+                  </button>
+                  <button
+                    onClick={() => setAscensionMode(true)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                      color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    }}
+                  >
+                    Ascension
+                  </button>
+                </div>
+              )}
 
               {/* Translation Selection Selector */}
-              {!ascensionMode && (
+              {(!ascensionMode || selectedGospelDate) && (
                 <select
                   value={activeTranslation}
                   onChange={(e) => setActiveTranslation(e.target.value)}
@@ -1364,7 +1374,7 @@ export default function Reader() {
               )}
 
               {/* Font Sizers */}
-              {!ascensionMode && (activeTranslation === 'douay-rheims' || customVerses) && (
+              {(!ascensionMode || selectedGospelDate) && (activeTranslation === 'douay-rheims' || customVerses) && (
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <button 
                     onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
@@ -1723,7 +1733,7 @@ export default function Reader() {
             width: '100%',
           }}
         >
-          {ascensionMode ? (
+          {ascensionMode && !selectedGospelDate ? (
             /* Mode B: Clean Ascension Press Launcher Dashboard */
             <div className="fade-in" style={{
               maxWidth: '600px',
