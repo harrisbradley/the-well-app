@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { BIBLE_BOOKS, CATEGORIES } from '../data/books';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +19,8 @@ import {
   getLiturgicalDayInfo, 
   getCalculatedLiturgicalDay, 
   formatDateKey, 
-  parseDateInput 
+  parseDateInput,
+  getVersesFromCitation 
 } from '../data/liturgicalHelper.js';
 
 const LITURGICAL_COLOR_MAP = {
@@ -328,6 +329,47 @@ export default function Reader() {
       parseInt(activeChapter, 10) >= r.startChapter && 
       parseInt(activeChapter, 10) <= r.endChapter
     );
+
+  // Compute active Gospel verses for current view when in Daily Gospel Mode
+  const gospelVerseData = useMemo(() => {
+    if (!selectedGospelDate || !gospelLiturgicalInfo?.gospel) return null;
+    const cit = gospelLiturgicalInfo.gospel.citation;
+    return getVersesFromCitation(cit, gospelLiturgicalInfo.gospel.bookId);
+  }, [selectedGospelDate, gospelLiturgicalInfo]);
+
+  const isGospelActiveForCurrentView = useMemo(() => {
+    if (!gospelVerseData || !activeBook) return false;
+    const targetBookId = gospelVerseData.bookId?.toLowerCase();
+    const activeBookId = activeBook.id?.toLowerCase();
+    const activeUsfm = activeBook.usfmCode?.toLowerCase();
+    const activeName = activeBook.name?.toLowerCase();
+    
+    return activeBookId === targetBookId || 
+      activeUsfm === targetBookId ||
+      (activeName && targetBookId && activeName.includes(targetBookId));
+  }, [gospelVerseData, activeBook]);
+
+  const gospelVersesInCurrentChapter = useMemo(() => {
+    if (!isGospelActiveForCurrentView || !gospelVerseData?.chapters?.[activeChapter]) return null;
+    return gospelVerseData.chapters[activeChapter];
+  }, [isGospelActiveForCurrentView, gospelVerseData, activeChapter]);
+
+  // Auto-scroll to the first verse of the Gospel reading when in Gospel mode
+  useEffect(() => {
+    if (selectedGospelDate && gospelVersesInCurrentChapter && !loading && !error) {
+      const sortedVerses = Array.from(gospelVersesInCurrentChapter).map(v => parseInt(v, 10)).sort((a, b) => a - b);
+      if (sortedVerses.length > 0) {
+        const firstVerseNum = sortedVerses[0];
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`verse-${firstVerseNum}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedGospelDate, activeChapter, activeBook, loading, error, gospelVersesInCurrentChapter]);
 
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
@@ -1543,15 +1585,30 @@ export default function Reader() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{
-                background: 'rgba(229, 193, 88, 0.1)',
-                border: '1px solid rgba(229, 193, 88, 0.3)',
+                background: 'rgba(229, 193, 88, 0.12)',
+                border: '1px solid rgba(229, 193, 88, 0.35)',
                 borderRadius: '6px',
                 padding: '4px 10px',
                 fontSize: '12px',
                 color: 'var(--color-sacred-gold)',
-                fontWeight: 600
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}>
-                📖 {gospelLiturgicalInfo.gospel?.citation}
+                <span>📖 {gospelLiturgicalInfo.gospel?.citation}</span>
+                <span style={{
+                  fontSize: '10px',
+                  background: 'rgba(229, 193, 88, 0.22)',
+                  color: 'var(--color-sacred-gold)',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  ✨ Illuminated
+                </span>
               </div>
 
               <div style={{ display: 'flex', gap: '4px' }}>
@@ -2060,17 +2117,30 @@ export default function Reader() {
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
                           const isFav = favoritedVerses.includes(verseNum);
+                          const isGospelVerse = Boolean(gospelVersesInCurrentChapter?.has(verseNum));
+                          const hasGospelInChapter = Boolean(gospelVersesInCurrentChapter && gospelVersesInCurrentChapter.size > 0);
+
+                          let verseClass = 'readable-verse';
+                          if (hasGospelInChapter) {
+                            if (isGospelVerse) {
+                              verseClass += ' gospel-verse-highlight';
+                            } else if (!isSelected && !isFav && !hasNote) {
+                              verseClass += ' gospel-verse-dimmed';
+                            }
+                          }
 
                           let verseBg = 'transparent';
-                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
-                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
-                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.32)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.20)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.12)';
+                          else if (isGospelVerse) verseBg = 'rgba(229, 193, 88, 0.14)';
 
                           let verseBorderBottom = 'none';
                           if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
-                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
+                          else if (hasNote) verseBorderBottom = '1.5px dashed rgba(229, 193, 88, 0.8)';
+                          else if (isGospelVerse) verseBorderBottom = '1.5px solid rgba(229, 193, 88, 0.45)';
 
                           if (parts.length > 1) {
                             return (
@@ -2120,20 +2190,22 @@ export default function Reader() {
                                           padding: '2px 4px',
                                           borderRadius: '4px',
                                           transition: 'all 0.2s ease',
-                                          boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                          boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                                         }}
-                                        className="readable-verse"
+                                        className={verseClass}
                                       >
                                         {idx === 0 && (
                                           <sup style={{
                                             fontFamily: 'var(--font-sans)',
                                             fontSize: '0.6em',
-                                            fontWeight: 700,
+                                            fontWeight: isGospelVerse ? 800 : 700,
                                             color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                             marginRight: '4px',
                                             verticalAlign: 'super',
+                                            textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                                           }}>
                                             {verseNum}
+                                            {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                             {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                                           </sup>
                                         )}
@@ -2159,19 +2231,21 @@ export default function Reader() {
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
-                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                               }}
-                              className="readable-verse"
+                              className={verseClass}
                             >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
-                                fontWeight: 700,
+                                fontWeight: isGospelVerse ? 800 : 700,
                                 color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
+                                textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                               }}>
                                 {verseNum}
+                                {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                 {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {text}
@@ -2185,17 +2259,30 @@ export default function Reader() {
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
                           const isFav = favoritedVerses.includes(verseNum);
+                          const isGospelVerse = Boolean(gospelVersesInCurrentChapter?.has(verseNum));
+                          const hasGospelInChapter = Boolean(gospelVersesInCurrentChapter && gospelVersesInCurrentChapter.size > 0);
+
+                          let verseClass = 'readable-verse';
+                          if (hasGospelInChapter) {
+                            if (isGospelVerse) {
+                              verseClass += ' gospel-verse-highlight';
+                            } else if (!isSelected && !isFav && !hasNote) {
+                              verseClass += ' gospel-verse-dimmed';
+                            }
+                          }
 
                           let verseBg = 'transparent';
-                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
-                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
-                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.32)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.20)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.12)';
+                          else if (isGospelVerse) verseBg = 'rgba(229, 193, 88, 0.14)';
 
                           let verseBorderBottom = 'none';
                           if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
-                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
+                          else if (hasNote) verseBorderBottom = '1.5px dashed rgba(229, 193, 88, 0.8)';
+                          else if (isGospelVerse) verseBorderBottom = '1.5px solid rgba(229, 193, 88, 0.45)';
 
                           return (
                             <span 
@@ -2210,19 +2297,21 @@ export default function Reader() {
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
-                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                               }}
-                              className="readable-verse"
+                              className={verseClass}
                             >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
-                                fontWeight: 700,
+                                fontWeight: isGospelVerse ? 800 : 700,
                                 color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
+                                textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                               }}>
                                 {verseNum}
+                                {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                 {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {cleanText}

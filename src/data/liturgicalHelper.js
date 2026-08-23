@@ -1,5 +1,4 @@
 import { 
-  LITURGICAL_COLORS, 
   SUNDAY_GOSPELS, 
   WEEKDAY_ORDINARY_GOSPELS, 
   FIXED_SOLEMNITIES_AND_FEASTS 
@@ -324,6 +323,82 @@ export async function getLiturgicalDayInfo(dateInput) {
 }
 
 /**
+ * Resolves a citation string (e.g. "Matthew 6:1-6, 16-18" or "Luke 21:25-28, 34-36" or "Matthew 26:14-27:66" or "John 15:26-27; 16:12-15")
+ * into a structured object containing bookId and a map of chapter -> Set of verse numbers (as strings).
+ */
+export function getVersesFromCitation(citation, defaultBookId = null) {
+  if (!citation) return { bookId: defaultBookId, chapters: {} };
+
+  // Determine bookId
+  let bookId = defaultBookId;
+  const lowerCit = citation.toLowerCase();
+  if (lowerCit.includes('matthew') || lowerCit.includes('matt') || lowerCit.includes('mt')) bookId = 'matthew';
+  else if (lowerCit.includes('mark') || lowerCit.includes('mk')) bookId = 'mark';
+  else if (lowerCit.includes('luke') || lowerCit.includes('lk')) bookId = 'luke';
+  else if (lowerCit.includes('john') || lowerCit.includes('jn')) bookId = 'john';
+
+  // Remove the book name from citation
+  const rest = citation.replace(/^(?:1|2|3)?\s*[A-Za-z]+\s+/i, '').trim();
+
+  // Chapters map: { "chapterNum": Set of verse strings }
+  const chapters = {};
+
+  // Check if citation contains semicolons separating chapter segments e.g. "15:26-27; 16:12-15" or "1:1-4; 4:14-21"
+  const segments = rest.split(/\s*;\s*/);
+
+  for (const seg of segments) {
+    // Check for cross-chapter range like "26:14-27:66"
+    const crossChapterMatch = seg.match(/^(\d+):(\d+)\s*-\s*(\d+):(\d+)$/);
+    if (crossChapterMatch) {
+      const startChap = parseInt(crossChapterMatch[1], 10);
+      const startV = parseInt(crossChapterMatch[2], 10);
+      const endChap = parseInt(crossChapterMatch[3], 10);
+      const endV = parseInt(crossChapterMatch[4], 10);
+
+      for (let ch = startChap; ch <= endChap; ch++) {
+        const chStr = String(ch);
+        if (!chapters[chStr]) chapters[chStr] = new Set();
+        const minV = (ch === startChap) ? startV : 1;
+        const maxV = (ch === endChap) ? endV : 150;
+        for (let v = minV; v <= maxV; v++) {
+          chapters[chStr].add(String(v));
+        }
+      }
+      continue;
+    }
+
+    // Standard chapter segment: "21:25-28, 34-36" or "6:1-6, 16-18" or "5:1-12" or "5:13"
+    const colonIdx = seg.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const chapNumStr = seg.substring(0, colonIdx).trim();
+    const versePart = seg.substring(colonIdx + 1).trim();
+
+    if (!chapters[chapNumStr]) chapters[chapNumStr] = new Set();
+
+    // Split commas: e.g. "25-28", "34-36"
+    const verseRanges = versePart.split(/\s*,\s*/);
+    for (const vr of verseRanges) {
+      if (vr.includes('-')) {
+        const [s, e] = vr.split('-').map(n => parseInt(n.trim(), 10));
+        if (!isNaN(s) && !isNaN(e)) {
+          for (let v = s; v <= e; v++) {
+            chapters[chapNumStr].add(String(v));
+          }
+        }
+      } else {
+        const singleV = parseInt(vr.trim(), 10);
+        if (!isNaN(singleV)) {
+          chapters[chapNumStr].add(String(singleV));
+        }
+      }
+    }
+  }
+
+  return { bookId, chapters };
+}
+
+/**
  * Resolves a Gospel citation (e.g. "Matthew 19:3-12") to book, chapter, and verse range.
  */
 export function parseGospelCitation(citation) {
@@ -361,31 +436,41 @@ export function parseGospelCitation(citation) {
 export async function fetchGospelVerses(gospelObj) {
   if (!gospelObj) return null;
   
-  const book = BIBLE_BOOKS.find(b => b.id === gospelObj.bookId);
+  const citationVerses = gospelObj.citation ? getVersesFromCitation(gospelObj.citation, gospelObj.bookId) : null;
+  const bookId = citationVerses?.bookId || gospelObj.bookId;
+  const book = BIBLE_BOOKS.find(b => b.id === bookId);
   if (!book) return null;
   
   try {
     const res = await fetch(`/douay-rheims/${encodeURIComponent(book.filename)}`);
     if (!res.ok) throw new Error('Failed to load Scripture');
     const chapterData = await res.json();
-    const allChapterVerses = chapterData[String(gospelObj.chapter)] || {};
+    const targetChapter = String(gospelObj.chapter);
+    const allChapterVerses = chapterData[targetChapter] || {};
     
     // Slice only the verses in the range if specified
     const gospelVerses = {};
-    const start = gospelObj.startVerse || 1;
-    const end = gospelObj.endVerse || Object.keys(allChapterVerses).length;
-    
-    for (let v = start; v <= end; v++) {
-      if (allChapterVerses[String(v)]) {
-        gospelVerses[String(v)] = allChapterVerses[String(v)];
+    if (citationVerses?.chapters?.[targetChapter] && citationVerses.chapters[targetChapter].size > 0) {
+      for (const vNum of citationVerses.chapters[targetChapter]) {
+        if (allChapterVerses[vNum]) {
+          gospelVerses[vNum] = allChapterVerses[vNum];
+        }
+      }
+    } else {
+      const start = gospelObj.startVerse || 1;
+      const end = gospelObj.endVerse || Object.keys(allChapterVerses).length;
+      for (let v = start; v <= end; v++) {
+        if (allChapterVerses[String(v)]) {
+          gospelVerses[String(v)] = allChapterVerses[String(v)];
+        }
       }
     }
     
     return {
       book,
       chapter: gospelObj.chapter,
-      startVerse: start,
-      endVerse: end,
+      startVerse: gospelObj.startVerse || 1,
+      endVerse: gospelObj.endVerse || Object.keys(allChapterVerses).length,
       verses: gospelVerses,
       allChapterVerses
     };
