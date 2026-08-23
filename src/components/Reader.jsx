@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { BIBLE_BOOKS, CATEGORIES } from '../data/books';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,21 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getDaysForVerse, getReadingsForDay } from '../data/planHelper';
+import { 
+  getLiturgicalDayInfo, 
+  getCalculatedLiturgicalDay, 
+  formatDateKey, 
+  parseDateInput,
+  getVersesFromCitation 
+} from '../data/liturgicalHelper.js';
 
+const LITURGICAL_COLOR_MAP = {
+  green: '#2D6A4F',
+  white: '#E5C158',
+  red: '#D90429',
+  purple: '#7209B7',
+  rose: '#D47391'
+};
 
 const PERIOD_COLORS = {
   "Early World": "#00B4D8",
@@ -206,8 +220,11 @@ export default function Reader() {
   // Search Parameters & Daily Plan Mode States
   const [searchParams, setSearchParams] = useSearchParams();
   const dayParam = searchParams.get('day');
+  const gospelParam = searchParams.get('gospel');
   const [selectedPodcastDay, setSelectedPodcastDay] = useState(null);
-  const [filterMode, setFilterMode] = useState('chapter'); // 'chapter' or 'day'
+  const [selectedGospelDate, setSelectedGospelDate] = useState(null);
+  const [gospelLiturgicalInfo, setGospelLiturgicalInfo] = useState(null);
+  const [filterMode, setFilterMode] = useState('chapter'); // 'chapter' | 'day' | 'gospel' | 'favorites'
 
   // Selected Book and Chapter
   const [activeBook, setActiveBook] = useState(BIBLE_BOOKS[0]); // Default to Genesis
@@ -249,7 +266,13 @@ export default function Reader() {
   const [notesPanelOpen, setNotesPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [fontSize, setFontSize] = useState(18); // Default 18px
-  const [ascensionMode, setAscensionMode] = useState(true); // Default to Ascension Companion Mode
+  const [ascensionMode, setAscensionMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('gospel')) return false;
+    }
+    return true;
+  }); // Default to Ascension Companion Mode for BIAY, Translation for Gospel
 
   useEffect(() => {
     const handleResize = () => {
@@ -306,6 +329,47 @@ export default function Reader() {
       parseInt(activeChapter, 10) >= r.startChapter && 
       parseInt(activeChapter, 10) <= r.endChapter
     );
+
+  // Compute active Gospel verses for current view when in Daily Gospel Mode
+  const gospelVerseData = useMemo(() => {
+    if (!selectedGospelDate || !gospelLiturgicalInfo?.gospel) return null;
+    const cit = gospelLiturgicalInfo.gospel.citation;
+    return getVersesFromCitation(cit, gospelLiturgicalInfo.gospel.bookId);
+  }, [selectedGospelDate, gospelLiturgicalInfo]);
+
+  const isGospelActiveForCurrentView = useMemo(() => {
+    if (!gospelVerseData || !activeBook) return false;
+    const targetBookId = gospelVerseData.bookId?.toLowerCase();
+    const activeBookId = activeBook.id?.toLowerCase();
+    const activeUsfm = activeBook.usfmCode?.toLowerCase();
+    const activeName = activeBook.name?.toLowerCase();
+    
+    return activeBookId === targetBookId || 
+      activeUsfm === targetBookId ||
+      (activeName && targetBookId && activeName.includes(targetBookId));
+  }, [gospelVerseData, activeBook]);
+
+  const gospelVersesInCurrentChapter = useMemo(() => {
+    if (!isGospelActiveForCurrentView || !gospelVerseData?.chapters?.[activeChapter]) return null;
+    return gospelVerseData.chapters[activeChapter];
+  }, [isGospelActiveForCurrentView, gospelVerseData, activeChapter]);
+
+  // Auto-scroll to the first verse of the Gospel reading when in Gospel mode
+  useEffect(() => {
+    if (selectedGospelDate && gospelVersesInCurrentChapter && !loading && !error) {
+      const sortedVerses = Array.from(gospelVersesInCurrentChapter).map(v => parseInt(v, 10)).sort((a, b) => a - b);
+      if (sortedVerses.length > 0) {
+        const firstVerseNum = sortedVerses[0];
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`verse-${firstVerseNum}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedGospelDate, activeChapter, activeBook, loading, error, gospelVersesInCurrentChapter]);
 
   // Toggle Category Expand/Collapse
   const toggleCategory = (cat) => {
@@ -473,12 +537,13 @@ export default function Reader() {
     setNoteScope('chapter');
   };
 
-  // Handle Search Params for Daily Plan Mode
+  // Handle Search Params for Daily Plan Mode & Daily Gospel Mode
   useEffect(() => {
     if (dayParam) {
       const dayNum = parseInt(dayParam, 10);
       if (dayNum >= 1 && dayNum <= 365) {
         setSelectedPodcastDay(dayNum);
+        setSelectedGospelDate(null);
         setFilterMode('day');
         
         // Find readings for this day
@@ -493,8 +558,35 @@ export default function Reader() {
           }
         }
       }
+    } else if (gospelParam) {
+      setAscensionMode(false);
+      const targetDateStr = gospelParam === 'today' ? formatDateKey(new Date()) : gospelParam;
+      setSelectedGospelDate(targetDateStr);
+      setSelectedPodcastDay(null);
+      
+      const localInfo = getCalculatedLiturgicalDay(targetDateStr);
+      setGospelLiturgicalInfo(localInfo);
+
+      if (localInfo?.gospel) {
+        const book = BIBLE_BOOKS.find(b => b.id === localInfo.gospel.bookId);
+        if (book) {
+          setActiveBook(book);
+          setActiveChapter(String(localInfo.gospel.chapter));
+        }
+      }
+
+      getLiturgicalDayInfo(targetDateStr).then(enriched => {
+        setGospelLiturgicalInfo(enriched);
+        if (enriched?.gospel) {
+          const book = BIBLE_BOOKS.find(b => b.id === enriched.gospel.bookId);
+          if (book) {
+            setActiveBook(book);
+            setActiveChapter(String(enriched.gospel.chapter));
+          }
+        }
+      });
     }
-  }, [dayParam]);
+  }, [dayParam, gospelParam]);
 
   // Firestore Real-Time Notes Listener
   useEffect(() => {
@@ -507,6 +599,12 @@ export default function Reader() {
         notesRef,
         where('userId', '==', currentUser.uid),
         where('podcastDay', '==', parseInt(selectedPodcastDay, 10))
+      );
+    } else if (filterMode === 'gospel' && selectedGospelDate) {
+      q = query(
+        notesRef,
+        where('userId', '==', currentUser.uid),
+        where('liturgicalDate', '==', selectedGospelDate)
       );
     } else {
       if (!activeBook) return;
@@ -525,7 +623,7 @@ export default function Reader() {
       }));
 
       const sortedNotes = fetchedNotes.sort((a, b) => {
-        if (filterMode === 'day') {
+        if (filterMode === 'day' || filterMode === 'gospel') {
           return (a.createdAt || 0) - (b.createdAt || 0);
         }
         const verseA = a.verse ? parseInt(a.verse, 10) : 0;
@@ -544,7 +642,7 @@ export default function Reader() {
     });
 
     return unsubscribe;
-  }, [currentUser, activeBook, activeChapter, filterMode, selectedPodcastDay]);
+  }, [currentUser, activeBook, activeChapter, filterMode, selectedPodcastDay, selectedGospelDate]);
 
   // Firestore Private Custom Scripture Listener (for RSV-CE user copy)
   useEffect(() => {
@@ -736,7 +834,14 @@ export default function Reader() {
 
       const targetDay = selectedPodcastDay || (matchingDays && matchingDays.length > 0 ? matchingDays[0] : null);
 
-      if (noteScope === 'day' && targetDay) {
+      if (noteScope === 'gospel' || (selectedGospelDate && noteScope === 'gospel')) {
+        notePayload.isGospelNote = true;
+        notePayload.liturgicalDate = selectedGospelDate || formatDateKey(new Date());
+        notePayload.feastName = gospelLiturgicalInfo?.celebrationTitle || 'Daily Gospel';
+        notePayload.liturgicalColor = gospelLiturgicalInfo?.color || 'green';
+        notePayload.gospelCitation = gospelLiturgicalInfo?.gospel?.citation || null;
+        notePayload.verse = newNoteVerse.trim() || (gospelLiturgicalInfo?.gospel?.startVerse ? String(gospelLiturgicalInfo.gospel.startVerse) : null);
+      } else if (noteScope === 'day' && targetDay) {
         notePayload.isDayNote = true;
         notePayload.podcastDay = targetDay;
         notePayload.verse = null;
@@ -744,10 +849,18 @@ export default function Reader() {
         notePayload.isDayNote = false;
         notePayload.verse = null;
         if (targetDay) notePayload.podcastDay = targetDay;
+        if (selectedGospelDate) {
+          notePayload.liturgicalDate = selectedGospelDate;
+          notePayload.feastName = gospelLiturgicalInfo?.celebrationTitle;
+        }
       } else {
         notePayload.isDayNote = false;
         notePayload.verse = newNoteVerse.trim() || null;
         if (targetDay) notePayload.podcastDay = targetDay;
+        if (selectedGospelDate) {
+          notePayload.liturgicalDate = selectedGospelDate;
+          notePayload.feastName = gospelLiturgicalInfo?.celebrationTitle;
+        }
       }
 
       await addDoc(notesRef, notePayload);
@@ -1157,8 +1270,38 @@ export default function Reader() {
                 </h2>
               </div>
 
-              {/* Right actions: Reflections & Matrix */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {/* Right actions: Reflections, Daily Gospel & Matrix */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
+                <button
+                  onClick={() => {
+                    if (selectedGospelDate) {
+                      setSelectedGospelDate(null);
+                      setSearchParams({});
+                    } else {
+                      setAscensionMode(false);
+                      navigate('/reader?gospel=today');
+                    }
+                  }}
+                  title="Today's Catholic Daily Gospel"
+                  style={{
+                    background: selectedGospelDate ? 'rgba(229, 193, 88, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    border: selectedGospelDate ? '1px solid var(--color-sacred-gold)' : '1px solid rgba(229, 193, 88, 0.25)',
+                    borderRadius: '6px',
+                    padding: isMobile ? '6px 10px' : '8px 14px',
+                    color: 'var(--color-sacred-gold)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  👑 <span style={{ display: isMobile ? 'none' : 'inline' }}>Daily Gospel</span>
+                </button>
+
                 <button
                   onClick={toggleNotesPanel}
                   title="Toggle Reflections Notes Drawer"
@@ -1208,47 +1351,49 @@ export default function Reader() {
               flexWrap: 'wrap',
               width: '100%',
             }}>
-              {/* Middle Toolbar Toggles */}
-              <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
-                <button
-                  onClick={() => {
-                    setAscensionMode(false);
-                    if (customVerses) {
-                      setActiveTranslation('rsv-ce');
-                    }
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  }}
-                >
-                  Translation
-                </button>
-                <button
-                  onClick={() => setAscensionMode(true)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
-                    color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
-                  }}
-                >
-                  Ascension
-                </button>
-              </div>
+              {/* Middle Toolbar Toggles - Only show Ascension mode toggle for BIAY Plan, exclude in Daily Gospel */}
+              {!selectedGospelDate && (
+                <div style={{ display: 'flex', gap: '2px', background: 'rgba(8, 10, 12, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(229, 193, 88, 0.1)' }}>
+                  <button
+                    onClick={() => {
+                      setAscensionMode(false);
+                      if (customVerses) {
+                        setActiveTranslation('rsv-ce');
+                      }
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: !ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                      color: !ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    }}
+                  >
+                    Translation
+                  </button>
+                  <button
+                    onClick={() => setAscensionMode(true)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: ascensionMode ? 'var(--color-sacred-gold)' : 'transparent',
+                      color: ascensionMode ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    }}
+                  >
+                    Ascension
+                  </button>
+                </div>
+              )}
 
               {/* Translation Selection Selector */}
-              {!ascensionMode && (
+              {(!ascensionMode || selectedGospelDate) && (
                 <select
                   value={activeTranslation}
                   onChange={(e) => setActiveTranslation(e.target.value)}
@@ -1271,7 +1416,7 @@ export default function Reader() {
               )}
 
               {/* Font Sizers */}
-              {!ascensionMode && (activeTranslation === 'douay-rheims' || customVerses) && (
+              {(!ascensionMode || selectedGospelDate) && (activeTranslation === 'douay-rheims' || customVerses) && (
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <button 
                     onClick={() => setFontSize(prev => Math.max(14, prev - 2))}
@@ -1406,6 +1551,144 @@ export default function Reader() {
           </div>
         )}
 
+        {/* Daily Gospel Liturgical Banner */}
+        {selectedGospelDate && gospelLiturgicalInfo && (
+          <div style={{
+            background: 'rgba(15, 20, 26, 0.95)',
+            borderBottom: '1px solid rgba(229, 193, 88, 0.15)',
+            borderLeft: `4px solid ${LITURGICAL_COLOR_MAP[gospelLiturgicalInfo.color?.toLowerCase()] || '#E5C158'}`,
+            padding: isMobile ? '10px 14px' : '12px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{
+                backgroundColor: LITURGICAL_COLOR_MAP[gospelLiturgicalInfo.color?.toLowerCase()] || '#E5C158',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                boxShadow: `0 0 8px ${LITURGICAL_COLOR_MAP[gospelLiturgicalInfo.color?.toLowerCase()] || '#E5C158'}80`,
+                display: 'inline-block'
+              }} />
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-slate)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+                  {parseDateInput(selectedGospelDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                </div>
+                <div style={{ fontSize: '15px', color: 'var(--color-sacred-gold)', fontFamily: 'var(--font-serif)', fontWeight: 700 }}>
+                  {gospelLiturgicalInfo.celebrationTitle}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{
+                background: 'rgba(229, 193, 88, 0.12)',
+                border: '1px solid rgba(229, 193, 88, 0.35)',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '12px',
+                color: 'var(--color-sacred-gold)',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>📖 {gospelLiturgicalInfo.gospel?.citation}</span>
+                <span style={{
+                  fontSize: '10px',
+                  background: 'rgba(229, 193, 88, 0.22)',
+                  color: 'var(--color-sacred-gold)',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  ✨ Illuminated
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  onClick={() => {
+                    const current = parseDateInput(selectedGospelDate);
+                    current.setDate(current.getDate() - 1);
+                    navigate(`/reader?gospel=${formatDateKey(current)}`);
+                  }} 
+                  title="Previous Day"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    color: 'var(--text-ivory)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ‹ Prev
+                </button>
+                <button 
+                  onClick={() => navigate('/reader?gospel=today')} 
+                  title="Today's Gospel"
+                  style={{
+                    background: 'rgba(229, 193, 88, 0.15)',
+                    border: '1px solid rgba(229, 193, 88, 0.3)',
+                    color: 'var(--color-sacred-gold)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Today
+                </button>
+                <button 
+                  onClick={() => {
+                    const current = parseDateInput(selectedGospelDate);
+                    current.setDate(current.getDate() + 1);
+                    navigate(`/reader?gospel=${formatDateKey(current)}`);
+                  }} 
+                  title="Next Day"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    color: 'var(--text-ivory)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Next ›
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSelectedGospelDate(null);
+                  setSearchParams({});
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#FCA5A5',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  marginLeft: '6px',
+                  textDecoration: 'underline',
+                }}
+              >
+                Exit Gospel Mode
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Exit Focus Floating Button */}
         {distractionFree && (
           <button
@@ -1507,7 +1790,7 @@ export default function Reader() {
             width: '100%',
           }}
         >
-          {ascensionMode ? (
+          {ascensionMode && !selectedGospelDate ? (
             /* Mode B: Clean Ascension Press Launcher Dashboard */
             <div className="fade-in" style={{
               maxWidth: '600px',
@@ -1834,17 +2117,30 @@ export default function Reader() {
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
                           const isFav = favoritedVerses.includes(verseNum);
+                          const isGospelVerse = Boolean(gospelVersesInCurrentChapter?.has(verseNum));
+                          const hasGospelInChapter = Boolean(gospelVersesInCurrentChapter && gospelVersesInCurrentChapter.size > 0);
+
+                          let verseClass = 'readable-verse';
+                          if (hasGospelInChapter) {
+                            if (isGospelVerse) {
+                              verseClass += ' gospel-verse-highlight';
+                            } else if (!isSelected && !isFav && !hasNote) {
+                              verseClass += ' gospel-verse-dimmed';
+                            }
+                          }
 
                           let verseBg = 'transparent';
-                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
-                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
-                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.32)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.20)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.12)';
+                          else if (isGospelVerse) verseBg = 'rgba(229, 193, 88, 0.14)';
 
                           let verseBorderBottom = 'none';
                           if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
-                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
+                          else if (hasNote) verseBorderBottom = '1.5px dashed rgba(229, 193, 88, 0.8)';
+                          else if (isGospelVerse) verseBorderBottom = '1.5px solid rgba(229, 193, 88, 0.45)';
 
                           if (parts.length > 1) {
                             return (
@@ -1894,20 +2190,22 @@ export default function Reader() {
                                           padding: '2px 4px',
                                           borderRadius: '4px',
                                           transition: 'all 0.2s ease',
-                                          boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                          boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                                         }}
-                                        className="readable-verse"
+                                        className={verseClass}
                                       >
                                         {idx === 0 && (
                                           <sup style={{
                                             fontFamily: 'var(--font-sans)',
                                             fontSize: '0.6em',
-                                            fontWeight: 700,
+                                            fontWeight: isGospelVerse ? 800 : 700,
                                             color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                             marginRight: '4px',
                                             verticalAlign: 'super',
+                                            textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                                           }}>
                                             {verseNum}
+                                            {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                             {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                                           </sup>
                                         )}
@@ -1933,19 +2231,21 @@ export default function Reader() {
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
-                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                               }}
-                              className="readable-verse"
+                              className={verseClass}
                             >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
-                                fontWeight: 700,
+                                fontWeight: isGospelVerse ? 800 : 700,
                                 color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
+                                textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                               }}>
                                 {verseNum}
+                                {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                 {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {text}
@@ -1959,17 +2259,30 @@ export default function Reader() {
                           const isSelected = activeSelectedVerses.includes(verseNum);
                           const hasNote = versesWithNotes.includes(verseNum);
                           const isFav = favoritedVerses.includes(verseNum);
+                          const isGospelVerse = Boolean(gospelVersesInCurrentChapter?.has(verseNum));
+                          const hasGospelInChapter = Boolean(gospelVersesInCurrentChapter && gospelVersesInCurrentChapter.size > 0);
+
+                          let verseClass = 'readable-verse';
+                          if (hasGospelInChapter) {
+                            if (isGospelVerse) {
+                              verseClass += ' gospel-verse-highlight';
+                            } else if (!isSelected && !isFav && !hasNote) {
+                              verseClass += ' gospel-verse-dimmed';
+                            }
+                          }
 
                           let verseBg = 'transparent';
-                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.28)';
-                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.18)';
-                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.10)';
+                          if (isSelected) verseBg = 'rgba(229, 193, 88, 0.32)';
+                          else if (isFav) verseBg = 'rgba(56, 189, 248, 0.20)';
+                          else if (hasNote) verseBg = 'rgba(229, 193, 88, 0.12)';
+                          else if (isGospelVerse) verseBg = 'rgba(229, 193, 88, 0.14)';
 
                           let verseBorderBottom = 'none';
                           if (isSelected) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav && hasNote) verseBorderBottom = '2px solid var(--color-sacred-gold)';
                           else if (isFav) verseBorderBottom = '1.5px solid rgba(56, 189, 248, 0.6)';
-                          else if (hasNote) verseBorderBottom = '1px dashed rgba(229, 193, 88, 0.7)';
+                          else if (hasNote) verseBorderBottom = '1.5px dashed rgba(229, 193, 88, 0.8)';
+                          else if (isGospelVerse) verseBorderBottom = '1.5px solid rgba(229, 193, 88, 0.45)';
 
                           return (
                             <span 
@@ -1984,19 +2297,21 @@ export default function Reader() {
                                 padding: '2px 4px',
                                 borderRadius: '4px',
                                 transition: 'all 0.2s ease',
-                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : 'none',
+                                boxShadow: isSelected ? '0 0 10px rgba(229, 193, 88, 0.25)' : (isGospelVerse ? '0 0 10px rgba(229, 193, 88, 0.15)' : 'none'),
                               }}
-                              className="readable-verse"
+                              className={verseClass}
                             >
                               <sup style={{
                                 fontFamily: 'var(--font-sans)',
                                 fontSize: '0.6em',
-                                fontWeight: 700,
+                                fontWeight: isGospelVerse ? 800 : 700,
                                 color: isFav ? '#38BDF8' : 'var(--color-sacred-gold)',
                                 marginRight: '4px',
                                 verticalAlign: 'super',
+                                textShadow: isGospelVerse ? '0 0 6px rgba(229, 193, 88, 0.6)' : 'none',
                               }}>
                                 {verseNum}
+                                {isGospelVerse && <span style={{ marginLeft: '1px', fontSize: '0.85em' }}>✨</span>}
                                 {hasNote && <span style={{ marginLeft: '2px', color: 'var(--color-sacred-gold)' }}>📝</span>}
                               </sup>
                               {cleanText}
@@ -2104,7 +2419,11 @@ export default function Reader() {
               Reflections
             </h3>
             <p style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
-              {filterMode === 'day' ? `Podcast Day ${selectedPodcastDay || '?'}` : `${activeBook.name} ${activeChapter}`}
+              {filterMode === 'gospel' 
+                ? (gospelLiturgicalInfo?.celebrationTitle || `Daily Gospel ${selectedGospelDate || ''}`)
+                : filterMode === 'day' 
+                  ? `Podcast Day ${selectedPodcastDay || '?'}` 
+                  : `${activeBook.name} ${activeChapter}`}
             </p>
           </div>
           <button 
@@ -2126,22 +2445,23 @@ export default function Reader() {
           background: 'rgba(255, 255, 255, 0.02)',
           borderBottom: '1px solid rgba(229, 193, 88, 0.08)',
           display: 'flex',
-          gap: '8px',
+          gap: '6px',
           alignItems: 'center',
+          flexWrap: 'wrap',
         }}>
           <button
             onClick={() => setFilterMode('chapter')}
             style={{
-              flex: 1,
-              padding: '6px 12px',
+              flex: '1 1 auto',
+              padding: '6px 8px',
               borderRadius: '4px',
               border: 'none',
-              background: filterMode === 'chapter' ? 'rgba(229, 193, 88, 0.12)' : 'transparent',
+              background: filterMode === 'chapter' ? 'rgba(229, 193, 88, 0.15)' : 'transparent',
               color: filterMode === 'chapter' ? 'var(--color-sacred-gold)' : 'var(--text-slate)',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.04em',
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
@@ -2149,6 +2469,34 @@ export default function Reader() {
             📖 Chapter
           </button>
           
+          <button
+            onClick={() => {
+              setFilterMode('gospel');
+              if (!selectedGospelDate) {
+                const todayStr = formatDateKey(new Date());
+                setSelectedGospelDate(todayStr);
+                const info = getCalculatedLiturgicalDay(todayStr);
+                setGospelLiturgicalInfo(info);
+              }
+            }}
+            style={{
+              flex: '1 1 auto',
+              padding: '6px 8px',
+              borderRadius: '4px',
+              border: 'none',
+              background: filterMode === 'gospel' ? 'rgba(229, 193, 88, 0.15)' : 'transparent',
+              color: filterMode === 'gospel' ? 'var(--color-sacred-gold)' : 'var(--text-slate)',
+              fontSize: '10px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            👑 Gospel
+          </button>
+
           <button
             onClick={() => {
               setFilterMode('day');
@@ -2161,16 +2509,16 @@ export default function Reader() {
               }
             }}
             style={{
-              flex: 1,
+              flex: '1 1 auto',
               padding: '6px 8px',
               borderRadius: '4px',
               border: 'none',
-              background: filterMode === 'day' ? 'rgba(229, 193, 88, 0.12)' : 'transparent',
+              background: filterMode === 'day' ? 'rgba(229, 193, 88, 0.15)' : 'transparent',
               color: filterMode === 'day' ? 'var(--color-sacred-gold)' : 'var(--text-slate)',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.04em',
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
@@ -2181,23 +2529,59 @@ export default function Reader() {
           <button
             onClick={() => setFilterMode('favorites')}
             style={{
-              flex: 1,
+              flex: '1 1 auto',
               padding: '6px 8px',
               borderRadius: '4px',
               border: 'none',
               background: filterMode === 'favorites' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               color: filterMode === 'favorites' ? '#38BDF8' : 'var(--text-slate)',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.04em',
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
           >
-            ⭐ Favorites ({favorites.length})
+            ⭐ Fav ({favorites.length})
           </button>
         </div>
+
+        {/* Gospel Date Selector dropdown */}
+        {filterMode === 'gospel' && (
+          <div style={{
+            padding: '10px 20px',
+            background: 'rgba(8, 10, 12, 0.3)',
+            borderBottom: '1px solid rgba(229, 193, 88, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+          }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-slate)' }}>Liturgical Date:</span>
+            <input
+              type="date"
+              value={selectedGospelDate || formatDateKey(new Date())}
+              onChange={(e) => {
+                if (e.target.value) {
+                  navigate(`/reader?gospel=${e.target.value}`);
+                }
+              }}
+              style={{
+                background: 'var(--bg-deep-charcoal)',
+                border: '1px solid rgba(229, 193, 88, 0.2)',
+                borderRadius: '4px',
+                color: 'var(--color-sacred-gold)',
+                padding: '4px 8px',
+                fontSize: '12px',
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+        )}
 
         {/* Day Selector dropdown */}
         {filterMode === 'day' && (
@@ -2376,7 +2760,9 @@ export default function Reader() {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        {note.isDayNote ? (
+                        {note.isGospelNote ? (
+                          `👑 ${note.feastName || 'Daily Gospel'} (${note.liturgicalDate || 'Gospel'})`
+                        ) : note.isDayNote ? (
                           `🎙️ Day ${note.podcastDay} Episode Reflection`
                         ) : note.verse ? (
                           `📖 ${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || activeBook.name} ${note.chapter}:${note.verse}`
@@ -2384,7 +2770,20 @@ export default function Reader() {
                           `📑 ${BIBLE_BOOKS.find(b => b.id === note.bookId)?.name || activeBook.name} ${note.chapter}`
                         )}
                       </span>
-                      {note.podcastDay && !note.isDayNote && (
+                      {note.isGospelNote && note.gospelCitation && (
+                        <span style={{
+                          fontSize: '10px',
+                          background: `${LITURGICAL_COLOR_MAP[note.liturgicalColor?.toLowerCase()] || '#E5C158'}20`,
+                          color: LITURGICAL_COLOR_MAP[note.liturgicalColor?.toLowerCase()] || '#E5C158',
+                          padding: '2px 6px',
+                          borderRadius: '8px',
+                          fontWeight: 600,
+                          border: `1px solid ${LITURGICAL_COLOR_MAP[note.liturgicalColor?.toLowerCase()] || '#E5C158'}40`,
+                        }}>
+                          {note.gospelCitation}
+                        </span>
+                      )}
+                      {note.podcastDay && !note.isDayNote && !note.isGospelNote && (
                         <span style={{
                           fontSize: '10px',
                           background: 'rgba(229, 193, 88, 0.12)',
@@ -2520,6 +2919,30 @@ export default function Reader() {
                 📑 Chapter ({activeBook.name} {activeChapter})
               </button>
 
+              {selectedGospelDate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoteScope('gospel');
+                    setActiveSelectedVerses([]);
+                    setNewNoteVerse('');
+                  }}
+                  style={{
+                    background: noteScope === 'gospel' ? 'var(--color-sacred-gold)' : 'rgba(255,255,255,0.05)',
+                    color: noteScope === 'gospel' ? 'var(--bg-midnight)' : 'var(--text-slate)',
+                    border: '1px solid rgba(229, 193, 88, 0.2)',
+                    borderRadius: '12px',
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  👑 Gospel Reflection
+                </button>
+              )}
+
               {activeSelectedVerses.length > 0 && (
                 <button
                   type="button"
@@ -2618,11 +3041,13 @@ export default function Reader() {
             <textarea
               className="input-field"
               placeholder={
-                noteScope === 'day' 
-                  ? `Write Episode reflection for Day ${selectedPodcastDay || matchingDays[0]}...` 
-                  : noteScope === 'chapter' 
-                    ? `Write Chapter note for ${activeBook.name} ${activeChapter}...` 
-                    : `Write Verse reflection for ${activeBook.name} ${activeChapter}${newNoteVerse ? `:${newNoteVerse}` : ''}...`
+                noteScope === 'gospel'
+                  ? `Write Gospel reflection for ${gospelLiturgicalInfo?.celebrationTitle || 'Today\'s Gospel'} (${gospelLiturgicalInfo?.gospel?.citation || selectedGospelDate})...`
+                  : noteScope === 'day' 
+                    ? `Write Episode reflection for Day ${selectedPodcastDay || matchingDays[0]}...` 
+                    : noteScope === 'chapter' 
+                      ? `Write Chapter note for ${activeBook.name} ${activeChapter}...` 
+                      : `Write Verse reflection for ${activeBook.name} ${activeChapter}${newNoteVerse ? `:${newNoteVerse}` : ''}...`
               }
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}

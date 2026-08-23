@@ -199,6 +199,51 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Daily Gospel Illuminated Verses */
+@keyframes gospel-pulse {
+  0%, 100% {
+    background-color: rgba(229, 193, 88, 0.12);
+    box-shadow: 0 0 8px rgba(229, 193, 88, 0.16), inset 0 0 0 1px rgba(229, 193, 88, 0.25);
+  }
+  50% {
+    background-color: rgba(229, 193, 88, 0.24);
+    box-shadow: 0 0 18px rgba(229, 193, 88, 0.38), inset 0 0 0 1px rgba(229, 193, 88, 0.50);
+  }
+}
+
+.gospel-verse-highlight {
+  animation: gospel-pulse 3.2s infinite ease-in-out;
+  border-radius: 4px;
+  position: relative;
+  display: inline;
+  color: #FFFFFF !important;
+  transition: all var(--transition-normal);
+}
+
+.gospel-verse-highlight:hover {
+  background-color: rgba(229, 193, 88, 0.32) !important;
+  box-shadow: 0 0 22px rgba(229, 193, 88, 0.45), inset 0 0 0 1px rgba(229, 193, 88, 0.6) !important;
+}
+
+.gospel-verse-dimmed {
+  opacity: 0.45;
+  color: #8E9BAE !important;
+  transition: opacity var(--transition-normal), color var(--transition-normal);
+}
+
+.gospel-verse-dimmed:hover {
+  opacity: 0.92 !important;
+  color: #ECE8E1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gospel-verse-highlight {
+    animation: none !important;
+    background-color: rgba(229, 193, 88, 0.18) !important;
+    box-shadow: 0 0 12px rgba(229, 193, 88, 0.25), inset 0 0 0 1px rgba(229, 193, 88, 0.4) !important;
+  }
+}
+
 /* Mobile Responsive Media Queries & Utility Classes */
 .mobile-only {
   display: none !important;

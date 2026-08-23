@@ -277,26 +277,63 @@ export default function ProgressMatrix() {
         borderBottom: '1px solid rgba(229, 193, 88, 0.1)',
         paddingBottom: '24px',
       }}>
-        {/* Navigation Breadcrumb */}
-        <button 
-          onClick={() => navigate('/')}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none',
-            border: 'none',
-            color: 'var(--color-sacred-gold)',
-            fontFamily: 'var(--font-sans)',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: 0,
-          }}
-        >
-          ← Back to Dashboard
-        </button>
+        {/* Navigation Row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <button 
+            onClick={() => navigate('/')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-sacred-gold)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: 0,
+            }}
+          >
+            ← Back to Dashboard
+          </button>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => navigate('/reader?gospel=today')}
+              style={{
+                background: 'rgba(229, 193, 88, 0.12)',
+                border: '1px solid rgba(229, 193, 88, 0.3)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                color: 'var(--color-sacred-gold)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              👑 Today's Gospel
+            </button>
+            <button
+              onClick={() => navigate('/reader')}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(229, 193, 88, 0.2)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                color: 'var(--color-sacred-gold)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              📖 Bible Reader
+            </button>
+          </div>
+        </div>
 
         <div style={{
           display: 'flex',
