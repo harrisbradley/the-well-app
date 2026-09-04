@@ -92,13 +92,13 @@ Rather than anchoring notes strictly to dates, **The Well** anchors notes to Scr
 
 ---
 
-## 🏠 Homelab & Raspberry Pi Deployment
+## 🏠 Homelab & Self-Hosting Deployment
 
-This application is deployed on a Raspberry Pi (`harrispi`) managed via PM2.
+This application can be deployed on a local server or Raspberry Pi managed via PM2.
 
 To serve locally after building:
 ```bash
 npm run build
 npx serve -s dist -l 4010
 ```
-*(See [homelab.json](file:///C:/Users/hopei/Documents/GitHub/the-well-app/homelab.json) for host runtime details).*
+*(See `homelab.json` for host runtime details).*
