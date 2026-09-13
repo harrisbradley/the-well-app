@@ -923,13 +923,8 @@
     {
         "title":  "Priestly Garments",
         "day":  44,
-        "period":  "Egypt \u0026 Exodus",
+        "period":  "Egypt & Exodus",
         "readings":  [
-                         {
-                             "bookId":  "EXO",
-                             "startChapter":  27,
-                             "endChapter":  28
-                         },
                          {
                              "bookId":  "EXO",
                              "startChapter":  27,
@@ -1420,11 +1415,6 @@
                              "endChapter":  17
                          },
                          {
-                             "bookId":  "NUM",
-                             "startChapter":  17,
-                             "endChapter":  17
-                         },
-                         {
                              "bookId":  "DEU",
                              "startChapter":  17,
                              "endChapter":  18
@@ -1667,11 +1657,6 @@
                              "endChapter":  32
                          },
                          {
-                             "bookId":  "NUM",
-                             "startChapter":  32,
-                             "endChapter":  32
-                         },
-                         {
                              "bookId":  "DEU",
                              "startChapter":  31,
                              "endChapter":  31
@@ -1710,11 +1695,6 @@
         "day":  79,
         "period":  "Desert Wanderings",
         "readings":  [
-                         {
-                             "bookId":  "PSA",
-                             "startChapter":  120,
-                             "endChapter":  120
-                         },
                          {
                              "bookId":  "NUM",
                              "startChapter":  34,
@@ -1810,11 +1790,6 @@
         "day":  84,
         "period":  "Conquest and Judges",
         "readings":  [
-                         {
-                             "bookId":  "JOS",
-                             "startChapter":  10,
-                             "endChapter":  10
-                         },
                          {
                              "bookId":  "JOS",
                              "startChapter":  10,
@@ -2125,11 +2100,6 @@
         "period":  "Messianic Fulfillment",
         "readings":  [
                          {
-                             "bookId":  "PRO",
-                             "startChapter":  5,
-                             "endChapter":  5
-                         },
-                         {
                              "bookId":  "JHN",
                              "startChapter":  7,
                              "endChapter":  9
@@ -2300,11 +2270,6 @@
         "period":  "Royal Kingdom",
         "readings":  [
                          {
-                             "bookId":  "PSA",
-                             "startChapter":  59,
-                             "endChapter":  59
-                         },
-                         {
                              "bookId":  "1SA",
                              "startChapter":  18,
                              "endChapter":  19
@@ -2436,15 +2401,10 @@
                      ]
     },
     {
-        "title":  "David\u0027s Wisdom",
+        "title":  "David's Wisdom",
         "day":  119,
         "period":  "Royal Kingdom",
         "readings":  [
-                         {
-                             "bookId":  "PSA",
-                             "startChapter":  18,
-                             "endChapter":  18
-                         },
                          {
                              "bookId":  "1SA",
                              "startChapter":  29,
@@ -2574,11 +2534,6 @@
         "readings":  [
                          {
                              "bookId":  "2SA",
-                             "startChapter":  7,
-                             "endChapter":  7
-                         },
-                         {
-                             "bookId":  "2SA",
                              "startChapter":  6,
                              "endChapter":  7
                          },
@@ -2595,15 +2550,10 @@
                      ]
     },
     {
-        "title":  "David\u0027s Victories",
+        "title":  "David's Victories",
         "day":  126,
         "period":  "Royal Kingdom",
         "readings":  [
-                         {
-                             "bookId":  "1CH",
-                             "startChapter":  10,
-                             "endChapter":  11
-                         },
                          {
                              "bookId":  "2SA",
                              "startChapter":  8,
@@ -2869,11 +2819,6 @@
         "period":  "Royal Kingdom",
         "readings":  [
                          {
-                             "bookId":  "PSA",
-                             "startChapter":  39,
-                             "endChapter":  39
-                         },
-                         {
                              "bookId":  "2SA",
                              "startChapter":  20,
                              "endChapter":  20
@@ -3089,24 +3034,24 @@
                      ]
     },
     {
-        "title":  "Day 148",
+        "title":  "Solomon's Wealth",
         "day":  148,
         "period":  "Royal Kingdom",
         "readings":  [
                          {
                              "bookId":  "1KI",
-                             "startChapter":  7,
-                             "endChapter":  7
+                             "startChapter":  6,
+                             "endChapter":  6
                          },
                          {
-                             "bookId":  "ECC",
-                             "startChapter":  1,
-                             "endChapter":  2
+                             "bookId":  "2CH",
+                             "startChapter":  9,
+                             "endChapter":  9
                          },
                          {
                              "bookId":  "PSA",
-                             "startChapter":  5,
-                             "endChapter":  5
+                             "startChapter":  4,
+                             "endChapter":  4
                          }
                      ]
     },
@@ -3533,15 +3478,10 @@
                      ]
     },
     {
-        "title":  "Joash\u0027s Downfall",
+        "title":  "Joash's Downfall",
         "day":  170,
         "period":  "Divided Kingdom",
         "readings":  [
-                         {
-                             "bookId":  "PSA",
-                             "startChapter":  69,
-                             "endChapter":  69
-                         },
                          {
                              "bookId":  "2KI",
                              "startChapter":  1,
@@ -3697,11 +3637,6 @@
         "period":  "Divided Kingdom",
         "readings":  [
                          {
-                             "bookId":  "PSA",
-                             "startChapter":  109,
-                             "endChapter":  109
-                         },
-                         {
                              "bookId":  "2KI",
                              "startChapter":  9,
                              "endChapter":  9
@@ -3833,11 +3768,6 @@
         "day":  183,
         "period":  "Divided Kingdom",
         "readings":  [
-                         {
-                             "bookId":  "JHN",
-                             "startChapter":  4,
-                             "endChapter":  4
-                         },
                          {
                              "bookId":  "2KI",
                              "startChapter":  17,
@@ -4086,21 +4016,6 @@
                              "endChapter":  6
                          },
                          {
-                             "bookId":  "ISA",
-                             "startChapter":  5,
-                             "endChapter":  5
-                         },
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  6,
-                             "endChapter":  6
-                         },
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  5,
-                             "endChapter":  6
-                         },
-                         {
                              "bookId":  "TOB",
                              "startChapter":  5,
                              "endChapter":  6
@@ -4249,11 +4164,6 @@
         "day":  201,
         "period":  "Exile",
         "readings":  [
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  22,
-                             "endChapter":  22
-                         },
                          {
                              "bookId":  "ISA",
                              "startChapter":  21,
@@ -4587,16 +4497,6 @@
                          {
                              "bookId":  "ISA",
                              "startChapter":  53,
-                             "endChapter":  53
-                         },
-                         {
-                             "bookId":  "EZK",
-                             "startChapter":  15,
-                             "endChapter":  15
-                         },
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  53,
                              "endChapter":  54
                          },
                          {
@@ -4619,11 +4519,6 @@
                          {
                              "bookId":  "ISA",
                              "startChapter":  55,
-                             "endChapter":  55
-                         },
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  55,
                              "endChapter":  56
                          },
                          {
@@ -4643,11 +4538,6 @@
         "day":  218,
         "period":  "Exile",
         "readings":  [
-                         {
-                             "bookId":  "EZK",
-                             "startChapter":  18,
-                             "endChapter":  18
-                         },
                          {
                              "bookId":  "ISA",
                              "startChapter":  57,
@@ -4692,16 +4582,6 @@
         "day":  220,
         "period":  "Exile",
         "readings":  [
-                         {
-                             "bookId":  "ISA",
-                             "startChapter":  61,
-                             "endChapter":  61
-                         },
-                         {
-                             "bookId":  "LUK",
-                             "startChapter":  4,
-                             "endChapter":  4
-                         },
                          {
                              "bookId":  "ISA",
                              "startChapter":  61,
@@ -4835,11 +4715,6 @@
         "period":  "Exile",
         "readings":  [
                          {
-                             "bookId":  "PRO",
-                             "startChapter":  14,
-                             "endChapter":  14
-                         },
-                         {
                              "bookId":  "JER",
                              "startChapter":  3,
                              "endChapter":  3
@@ -4879,15 +4754,10 @@
                      ]
     },
     {
-        "title":  "The Watchman\u0027s Duty",
+        "title":  "The Watchman's Duty",
         "day":  228,
         "period":  "Exile",
         "readings":  [
-                         {
-                             "bookId":  "EZK",
-                             "startChapter":  33,
-                             "endChapter":  33
-                         },
                          {
                              "bookId":  "JER",
                              "startChapter":  5,
@@ -5153,11 +5023,6 @@
         "period":  "Exile",
         "readings":  [
                          {
-                             "bookId":  "PRO",
-                             "startChapter":  16,
-                             "endChapter":  16
-                         },
-                         {
                              "bookId":  "JER",
                              "startChapter":  23,
                              "endChapter":  23
@@ -5219,15 +5084,10 @@
                      ]
     },
     {
-        "title":  "The Lord\u0027s Plans",
+        "title":  "The Lord's Plans",
         "day":  243,
         "period":  "Exile",
         "readings":  [
-                         {
-                             "bookId":  "JER",
-                             "startChapter":  29,
-                             "endChapter":  29
-                         },
                          {
                              "bookId":  "JER",
                              "startChapter":  28,
@@ -5959,11 +5819,6 @@
                              "endChapter":  10
                          },
                          {
-                             "bookId":  "NEH",
-                             "startChapter":  10,
-                             "endChapter":  10
-                         },
-                         {
                              "bookId":  "EST",
                              "startChapter":  15,
                              "endChapter":  15
@@ -6597,11 +6452,6 @@
         "period":  "Maccabean Revolt",
         "readings":  [
                          {
-                             "bookId":  "WIS",
-                             "startChapter":  10,
-                             "endChapter":  10
-                         },
-                         {
                              "bookId":  "2MA",
                              "startChapter":  10,
                              "endChapter":  10
@@ -6629,11 +6479,6 @@
                              "endChapter":  11
                          },
                          {
-                             "bookId":  "2MA",
-                             "startChapter":  11,
-                             "endChapter":  11
-                         },
-                         {
                              "bookId":  "WIS",
                              "startChapter":  11,
                              "endChapter":  12
@@ -6650,11 +6495,6 @@
         "day":  309,
         "period":  "Maccabean Revolt",
         "readings":  [
-                         {
-                             "bookId":  "2MA",
-                             "startChapter":  12,
-                             "endChapter":  12
-                         },
                          {
                              "bookId":  "2MA",
                              "startChapter":  12,
@@ -6858,14 +6698,14 @@
                      ]
     },
     {
-        "title":  "Peter\u0027s Denial Foretold",
+        "title":  "Peter's Denial Foretold",
         "day":  320,
         "period":  "Messianic Fulfillment",
         "readings":  [
                          {
                              "bookId":  "LUK",
                              "startChapter":  20,
-                             "endChapter":  20
+                             "endChapter":  22
                          },
                          {
                              "bookId":  "PRO",
@@ -6875,14 +6715,14 @@
                      ]
     },
     {
-        "title":  "Jesus\u0027 Prayer in the Garden",
+        "title":  "Jesus' Prayer in the Garden",
         "day":  321,
         "period":  "Messianic Fulfillment",
         "readings":  [
                          {
                              "bookId":  "LUK",
                              "startChapter":  22,
-                             "endChapter":  22
+                             "endChapter":  24
                          },
                          {
                              "bookId":  "PRO",
@@ -6940,11 +6780,6 @@
         "day":  324,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "ACT",
-                             "startChapter":  3,
-                             "endChapter":  3
-                         },
                          {
                              "bookId":  "ACT",
                              "startChapter":  3,
@@ -7149,11 +6984,6 @@
                              "endChapter":  12
                          },
                          {
-                             "bookId":  "ACT",
-                             "startChapter":  12,
-                             "endChapter":  12
-                         },
-                         {
                              "bookId":  "1CO",
                              "startChapter":  5,
                              "endChapter":  6
@@ -7220,11 +7050,6 @@
                              "endChapter":  15
                          },
                          {
-                             "bookId":  "ACT",
-                             "startChapter":  15,
-                             "endChapter":  15
-                         },
-                         {
                              "bookId":  "1CO",
                              "startChapter":  11,
                              "endChapter":  12
@@ -7241,11 +7066,6 @@
         "day":  337,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "ACT",
-                             "startChapter":  16,
-                             "endChapter":  16
-                         },
                          {
                              "bookId":  "ACT",
                              "startChapter":  16,
@@ -7318,11 +7138,6 @@
                              "endChapter":  19
                          },
                          {
-                             "bookId":  "ACT",
-                             "startChapter":  19,
-                             "endChapter":  19
-                         },
-                         {
                              "bookId":  "2CO",
                              "startChapter":  1,
                              "endChapter":  2
@@ -7339,11 +7154,6 @@
         "day":  341,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "ACT",
-                             "startChapter":  20,
-                             "endChapter":  20
-                         },
                          {
                              "bookId":  "ACT",
                              "startChapter":  20,
@@ -7372,11 +7182,6 @@
                              "endChapter":  21
                          },
                          {
-                             "bookId":  "ACT",
-                             "startChapter":  21,
-                             "endChapter":  21
-                         },
-                         {
                              "bookId":  "2CO",
                              "startChapter":  6,
                              "endChapter":  8
@@ -7389,15 +7194,10 @@
                      ]
     },
     {
-        "title":  "God Uses Paul\u0027s Past",
+        "title":  "God Uses Paul's Past",
         "day":  343,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "ACT",
-                             "startChapter":  22,
-                             "endChapter":  22
-                         },
                          {
                              "bookId":  "ACT",
                              "startChapter":  22,
@@ -7416,15 +7216,10 @@
                      ]
     },
     {
-        "title":  "The Thorn in Paul\u0027s Side",
+        "title":  "The Thorn in Paul's Side",
         "day":  344,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "ACT",
-                             "startChapter":  23,
-                             "endChapter":  23
-                         },
                          {
                              "bookId":  "ACT",
                              "startChapter":  23,
@@ -7451,6 +7246,16 @@
                              "bookId":  "ACT",
                              "startChapter":  24,
                              "endChapter":  24
+                         },
+                         {
+                             "bookId":  "GAL",
+                             "startChapter":  1,
+                             "endChapter":  3
+                         },
+                         {
+                             "bookId":  "PRO",
+                             "startChapter":  29,
+                             "endChapter":  29
                          }
                      ]
     },
@@ -7613,11 +7418,6 @@
         "day":  353,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "1PE",
-                             "startChapter":  3,
-                             "endChapter":  3
-                         },
                          {
                              "bookId":  "1PE",
                              "startChapter":  3,
@@ -7841,15 +7641,10 @@
                      ]
     },
     {
-        "title":  "Christ\u0027s Sacrifice Once for All",
+        "title":  "Christ's Sacrifice Once for All",
         "day":  364,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "REV",
-                             "startChapter":  18,
-                             "endChapter":  18
-                         },
                          {
                              "bookId":  "REV",
                              "startChapter":  18,
@@ -7872,11 +7667,6 @@
         "day":  365,
         "period":  "The Church",
         "readings":  [
-                         {
-                             "bookId":  "REV",
-                             "startChapter":  21,
-                             "endChapter":  21
-                         },
                          {
                              "bookId":  "REV",
                              "startChapter":  21,
