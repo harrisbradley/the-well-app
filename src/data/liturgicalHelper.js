@@ -209,7 +209,6 @@ export function getCalculatedLiturgicalDay(dateInput) {
       seasonWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
     } else {
       // Ordinary Time Part 2
-      const diffFromPentecost = Math.floor((d - pentecost) / (1000 * 60 * 60 * 24));
       const weeksFromAdvent = Math.floor((adventStart - d) / (1000 * 60 * 60 * 24 * 7));
       seasonWeek = Math.max(1, Math.min(34, 34 - weeksFromAdvent));
     }
@@ -268,7 +267,7 @@ export async function getLiturgicalDayInfo(dateInput) {
       const parsed = JSON.parse(cached);
       return { ...localCalc, ...parsed };
     }
-  } catch (e) {
+  } catch {
     // Ignore cache access issues
   }
 
@@ -311,11 +310,11 @@ export async function getLiturgicalDayInfo(dateInput) {
       const result = { ...localCalc, ...enriched };
       try {
         localStorage.setItem(cacheKey, JSON.stringify(enriched));
-      } catch (e) {}
+      } catch { /* ignore */ }
       
       return result;
     }
-  } catch (err) {
+  } catch {
     // Network timeout or offline - seamlessly return local calculated data
   }
 

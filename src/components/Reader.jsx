@@ -69,7 +69,7 @@ function tagPoetryAndHeadings(text) {
       const lower = cleanWord.toLowerCase();
       const smallWords = ['of', 'the', 'and', 'in', 'on', 'a', 'an', 'to', 'for', 'by', 'with', 'from', 'at', 'but', 'nor', 'yet', 'so', 'is', 'was', 'were', 'be', 'or', 'as'];
       if (smallWords.includes(lower)) return true;
-      return /^[A-Z“\"'\u2018-\u201d]/.test(cleanWord);
+      return /^[A-Z“"'\u2018-\u201d]/.test(cleanWord);
     });
 
     const isShort = trimmed.length > 3 && trimmed.length < 80;
@@ -85,8 +85,8 @@ function tagPoetryAndHeadings(text) {
     }
 
     // 3. If it is short, starts with a curly quote or ends with a curly quote, or is adjacent to indented poetry, tag it as poetry
-    const startsWithQuote = /^[“\"'\u2018]/.test(trimmed);
-    const endsWithQuote = /[”\"'\u2019]$/.test(trimmed);
+    const startsWithQuote = /^[“"'\u2018]/.test(trimmed);
+    const endsWithQuote = /[”"'\u2019]$/.test(trimmed);
     
     // Check neighbors for indentation to group the poem
     const prevLine = lines[index - 1] || '';
@@ -412,7 +412,7 @@ export default function Reader() {
         setError('Could not download scripture text. Please check your internet connection.');
         setLoading(false);
       });
-  }, [activeBook, activeChapter, ascensionMode, activeTranslation]);
+  }, [activeBook, activeChapter, ascensionMode, activeTranslation, bookCache]);
 
   // Update local verses from cache in JSON mode when chapter shifts
   useEffect(() => {
@@ -709,58 +709,6 @@ export default function Reader() {
   }, [currentUser, activeBook, activeChapter]);
 
   // Favorite Verse Handlers with Range Support & Optimistic UI Update
-  const toggleFavoriteVerse = async (verseNum) => {
-    if (!activeBook || !activeChapter || !verseNum) return;
-    const vStr = String(verseNum);
-    const isFav = favoritedVerses.includes(vStr);
-
-    if (isFav) {
-      setFavoritedVerses(prev => prev.filter(v => v !== vStr));
-      const matchingFavDocs = favorites.filter(f => 
-        f.bookId === activeBook.id && 
-        String(f.chapter) === String(activeChapter) && 
-        parseVerseRange(f.verse).includes(vStr)
-      );
-      const docIdsToRemove = new Set(matchingFavDocs.map(f => f.id));
-      setFavorites(prev => prev.filter(f => !docIdsToRemove.has(f.id)));
-
-      if (currentUser) {
-        for (const fDoc of matchingFavDocs) {
-          try {
-            await deleteDoc(doc(db, 'favorites', fDoc.id));
-          } catch (err) {
-            console.error("Error deleting favorite doc:", err);
-          }
-        }
-      }
-    } else {
-      setFavoritedVerses(prev => [...prev, vStr]);
-      const tempId = `temp_${Date.now()}`;
-      setFavorites(prev => [{
-        id: tempId,
-        userId: currentUser?.uid || 'guest',
-        bookId: activeBook.id,
-        chapter: String(activeChapter),
-        verse: vStr,
-        createdAt: Date.now()
-      }, ...prev]);
-
-      if (currentUser) {
-        try {
-          await addDoc(collection(db, 'favorites'), {
-            userId: currentUser.uid,
-            bookId: activeBook.id,
-            chapter: String(activeChapter),
-            verse: vStr,
-            createdAt: Date.now()
-          });
-        } catch (err) {
-          console.error("Error adding favorite to Firestore:", err);
-        }
-      }
-    }
-  };
-
   const toggleFavoriteSelectedVerses = async () => {
     if (!activeBook || !activeChapter || activeSelectedVerses.length === 0) return;
     const formattedVerseStr = formatVerseRange(activeSelectedVerses);
