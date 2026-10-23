@@ -11,6 +11,7 @@ import { auth } from '../firebase';
 
 const AuthContext = createContext();
 
+// oxlint-disable-next-line react/only-export-components
 export function useAuth() {
   return useContext(AuthContext);
 }

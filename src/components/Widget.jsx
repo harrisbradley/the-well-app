@@ -257,7 +257,6 @@ export default function Widget() {
   // Load enriched liturgical info and scripture text for selected Gospel date
   useEffect(() => {
     let isCurrent = true;
-    const dateKey = formatDateKey(selectedDate);
     const calculated = getCalculatedLiturgicalDay(selectedDate);
     setLiturgicalInfo(calculated);
 
