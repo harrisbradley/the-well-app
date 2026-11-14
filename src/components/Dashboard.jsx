@@ -153,6 +153,20 @@ export default function Dashboard() {
             <div 
               className="glass-panel-interactive" 
               style={{ padding: '24px' }}
+              onClick={() => navigate('/reflections')}
+            >
+              <h3 style={{ color: 'var(--color-sacred-gold)', marginBottom: '12px', fontSize: '18px', fontFamily: 'var(--font-serif)' }}>
+                Reflections &amp; Bookmarks
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-slate)', marginBottom: '16px' }}>
+                View, search, and manage all of your study notes, episode reflections, and favorited verses.
+              </p>
+              <span style={{ fontSize: '12px', color: 'var(--color-sacred-gold)', fontWeight: 600 }}>VIEW REFLECTIONS →</span>
+            </div>
+
+            <div 
+              className="glass-panel-interactive" 
+              style={{ padding: '24px' }}
               onClick={() => window.open('/widget?mode=gospel', '_blank')}
             >
               <h3 style={{ color: 'var(--color-sacred-gold)', marginBottom: '12px', fontSize: '18px', fontFamily: 'var(--font-serif)' }}>

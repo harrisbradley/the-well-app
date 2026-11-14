@@ -221,6 +221,9 @@ export default function Reader() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dayParam = searchParams.get('day');
   const gospelParam = searchParams.get('gospel');
+  const bookParam = searchParams.get('book');
+  const chapterParam = searchParams.get('chapter');
+  const verseParam = searchParams.get('verse');
   const [selectedPodcastDay, setSelectedPodcastDay] = useState(null);
   const [selectedGospelDate, setSelectedGospelDate] = useState(null);
   const [gospelLiturgicalInfo, setGospelLiturgicalInfo] = useState(null);
@@ -269,10 +272,10 @@ export default function Reader() {
   const [ascensionMode, setAscensionMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('gospel')) return false;
+      if (params.get('gospel') || params.get('book')) return false;
     }
     return true;
-  }); // Default to Ascension Companion Mode for BIAY, Translation for Gospel
+  }); // Default to Ascension Companion Mode for BIAY, Translation for Gospel or direct book/verse links
 
   useEffect(() => {
     const handleResize = () => {
@@ -585,8 +588,52 @@ export default function Reader() {
           }
         }
       });
+    } else if (bookParam) {
+      setAscensionMode(false);
+      setSelectedPodcastDay(null);
+      setSelectedGospelDate(null);
+      setFilterMode('chapter');
+
+      const resolvedBook = BIBLE_BOOKS.find(
+        b => b.id.toLowerCase() === bookParam.toLowerCase() || b.usfmCode.toLowerCase() === bookParam.toLowerCase()
+      );
+      if (resolvedBook) {
+        setActiveBook(resolvedBook);
+      }
+      if (chapterParam) {
+        setActiveChapter(String(chapterParam));
+      } else {
+        setActiveChapter('1');
+      }
+      if (verseParam) {
+        const parsedVerses = parseVerseRange(verseParam);
+        setActiveSelectedVerses(parsedVerses);
+        setNewNoteVerse(formatVerseRange(parsedVerses));
+        setNoteScope('verse');
+      } else {
+        setActiveSelectedVerses([]);
+        setNewNoteVerse('');
+        setNoteScope('chapter');
+      }
     }
-  }, [dayParam, gospelParam]);
+  }, [dayParam, gospelParam, bookParam, chapterParam, verseParam]);
+
+  // Auto-scroll to deep-linked verse when navigating via ?book=...&chapter=...&verse=...
+  useEffect(() => {
+    if (verseParam && !loading && !error) {
+      const parsedVerses = parseVerseRange(verseParam);
+      if (parsedVerses.length > 0) {
+        const firstVerseNum = parsedVerses[0];
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`verse-${firstVerseNum}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [verseParam, activeBook, activeChapter, loading, error, customVerses, verses]);
 
   // Firestore Real-Time Notes Listener
   useEffect(() => {
